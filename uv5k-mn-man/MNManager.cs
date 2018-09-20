@@ -109,7 +109,7 @@ namespace uv5k_mn_mod
         {
             public string p1 { get; set; }
             public int p2 { get; set; }
-            public string p3 { get; set; }
+            public int p3 { get; set; }
         }
         void TestReflectionList(dynamic data)
         {
@@ -133,6 +133,9 @@ namespace uv5k_mn_mod
                             break;
                         case "intData":
                             itemr.p2 = (int)prop.GetValue(item);
+                            break;
+                        case "enumData":
+                            itemr.p3 = (int)prop.GetValue(item);
                             break;
                         default:
                             break;
