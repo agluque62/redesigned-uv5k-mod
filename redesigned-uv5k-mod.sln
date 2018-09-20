@@ -7,6 +7,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "uv5k-mn-man", "uv5k-mn-man\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{928E17F6-609F-4EF4-BF26-652543BB6EF9}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Referencias", "Referencias", "{F756802B-32A0-4B95-88C5-8B1F28A82D0E}"
+	ProjectSection(SolutionItems) = preProject
+		Referencias\libspread.dll = Referencias\libspread.dll
+		Referencias\protobuf-net.dll = Referencias\protobuf-net.dll
+		Referencias\U5ki.Infrastructure.dll = Referencias\U5ki.Infrastructure.dll
+		Referencias\Utilities.dll = Referencias\Utilities.dll
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
