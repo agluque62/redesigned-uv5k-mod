@@ -14,24 +14,17 @@ using uv5k_mn_mod.Modelo;
 
 namespace uv5k_mn_mod
 {
-    public class MNManagerService : IService, IMNManagerService
+    public class MNManagerService : IService, IDisposable
     {
         private const string MNManagerServiceTopic = "m+n-man";
         private string _name;
         private ServiceStatus _status;
         private bool _master;
         private readonly Semaphore accsmp;
-        private readonly Helpers.ILogHelper log;
+        private Helpers.ILogHelper log;
 
         private Registry _Registry = null;
         private string LastCfgId { get; set; }
-
-        #region IMNManagerService
-
-        public event Action<string, string, string> ChangeUri;
-        public event Action<string, bool> EnableUri;
-
-        #endregion
 
         #region IService
 
@@ -165,6 +158,11 @@ namespace uv5k_mn_mod
             log = new Helpers.LogHelper();
         }
 
+        public void Dispose()
+        {
+            (log as IDisposable).Dispose();
+        }
+
         #region Eventos
 
         private void _Registry_ResourceChanged(object sender, RsChangeInfo par)
@@ -200,7 +198,7 @@ namespace uv5k_mn_mod
                             else
                             {
                                 string str = Serializer.Deserialize<string>(ms);
-                                log.From().Trace($"String Received...");
+                                log.From().Trace($"String <<{str}>> Received...");
                             }
                         }
                         catch (Exception x)
@@ -320,13 +318,13 @@ namespace uv5k_mn_mod
 
         private void Configure(Cd40Cfg cfg)
         {
-            log.Trace($"Configuring Service in Master={_master} State");
+            log.From().Trace($"Configuring Service in Master={_master} State");
             // TODO... Configura el servicio interno...
 
-            _Registry.SetValue<string>(MNManagerServiceTopic, null, "Hola Hola");
-            _Registry.Publish();
+            //_Registry.SetValue<string>(MNManagerServiceTopic, "fromme", "Hola Hola");
+            //_Registry.Publish();
 
-            log.Trace($"Service Configured in Master={_master} State");
+            log.From().Trace($"Service Configured in Master={_master} State");
         }
 
         private void Update(MNDisabledNodes updateInfo)
@@ -340,5 +338,6 @@ namespace uv5k_mn_mod
                 log.Trace($"Service Updated in Master={_master} State");
             }
         }
+
     }
 }

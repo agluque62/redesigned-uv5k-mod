@@ -61,10 +61,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Helpers\LogHelper.cs" />
-    <Compile Include="IMNManagerService.cs" />
+    <Compile Include="Infrastructure\Infrastructure.cs" />
     <Compile Include="MNManagerService.cs" />
-    <Compile Include="Modelo\MNManFreqData.cs" />
-    <Compile Include="Modelo\MNManRdEquipmentData.cs" />
+    <Compile Include="Modelo\DataItems.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Servicios\MNManager.cs" />
     <Compile Include="Helpers\TestingRoutines.cs" />

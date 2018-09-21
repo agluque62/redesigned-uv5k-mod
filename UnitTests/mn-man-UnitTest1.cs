@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Windows.Forms;
+using System.Threading.Tasks;
 
 using U5ki.Infrastructure;
 using uv5k_mn_mod;
@@ -32,18 +33,18 @@ namespace UnitTests
 
         Registry reg = null;
 
-        void PrepareRegistry(string topic)
+        void PrepareRegistry(string testing_topic)
         {
-            reg = new Registry("simul");
+            reg = new Registry("utest");
             reg.MasterStatusChanged += (p1, p2) =>
             {
             };
             reg.ResourceChanged += (p1, p2) =>
             {
             };
-            reg.SubscribeToMasterTopic(topic);
-            reg.SubscribeToTopic<string>(topic);
-            reg.Join(topic);
+            reg.SubscribeToMasterTopic(testing_topic);
+            reg.SubscribeToTopic<string>(testing_topic);
+            reg.Join(testing_topic);
         }
 
         void UnprepareRegistry()
@@ -54,30 +55,38 @@ namespace UnitTests
         [TestMethod]
         public void TestMethod1()
         {
-            IService service = new MNManagerService();
-            IMNManagerService eventService = (IMNManagerService)service;
-
-            PrepareRegistry(service.Name);
-
-            service.Start();
-            Assert.IsTrue(service.Status == U5ki.Infrastructure.ServiceStatus.Running, "Error en Rutina de Arranque");
-
-            DialogResult res = DialogResult.None;
-
-            while (res != DialogResult.Cancel)
+            using (IDisposable service_dispose = new MNManagerService())
             {
-                res = MessageBox.Show("Servicio Arrancado", "Caption", MessageBoxButtons.YesNoCancel);
-                if (res == DialogResult.Yes)
+                IService service = (service_dispose as IService);
+
+                PrepareRegistry(service.Name);
+
+                service.Start();
+                Assert.IsTrue(service.Status == U5ki.Infrastructure.ServiceStatus.Running, "Error en Rutina de Arranque");
+
+                DialogResult res = DialogResult.None;
+
+                while (res != DialogResult.Cancel)
                 {
-                    reg.SetValue<string>(service.Name, null, "Hola...");
-                    reg.Publish(true);
+                    res = MessageBox.Show("Servicio Arrancado", "Caption", MessageBoxButtons.YesNoCancel);
+                    if (res == DialogResult.Yes)
+                    {
+                        reg.SetValue<string>(service.Name, "fromsimul", "Hola...");
+                        reg.Publish(true);
+                    }
+                    else if (res == DialogResult.No)
+                    {
+                        UnprepareRegistry();
+                        Task.Delay(2000).Wait();
+                        PrepareRegistry(service.Name);
+                    }
                 }
+
+                service.Stop();
+                Assert.IsTrue(service.Status == U5ki.Infrastructure.ServiceStatus.Stopped, "Error en Rutina de Parada");
+
+                UnprepareRegistry();
             }
-
-            service.Stop();
-            Assert.IsTrue(service.Status == U5ki.Infrastructure.ServiceStatus.Stopped, "Error en Rutina de Parada");
-
-            UnprepareRegistry();
         }
     }
 }

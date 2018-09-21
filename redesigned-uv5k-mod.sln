@@ -15,6 +15,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Referencias", "Referencias"
 		Referencias\Utilities.dll = Referencias\Utilities.dll
 	EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Doc", "Doc", "{7F46B27C-2FDC-4615-8DD7-A9F94724212A}"
+	ProjectSection(SolutionItems) = preProject
+		Doc\ULISES V 5000-I 2.X. Gestor M+N-EMPL. Analisis Funcional-05.docx = Doc\ULISES V 5000-I 2.X. Gestor M+N-EMPL. Analisis Funcional-05.docx
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

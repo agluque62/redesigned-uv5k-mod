@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
 
@@ -12,7 +13,7 @@ namespace uv5k_mn_mod.Helpers
 {
     public interface ILogHelper
     {
-        ILogHelper From([CallerFilePathAttribute ] string caller = null, [CallerLineNumber] int lineNumber = 0);
+        ILogHelper From([CallerFilePathAttribute] string caller = null, [CallerLineNumber] int lineNumber = 0);
 
         void Trace(string msg, params object[] par);
         void Debug(string msg, params object[] par);
@@ -23,53 +24,107 @@ namespace uv5k_mn_mod.Helpers
 
         void TraceException(Exception x);
     }
-    public class LogHelper : ILogHelper
+    public class LogHelper : ILogHelper, IDisposable
     {
-        #region private / protected
-            protected Logger Log = LogManager.GetLogger("RdMNService");
-        #endregion
+        #region ILogHelper
 
         ILogHelper ILogHelper.From(string caller, int lineNumber)
         {
-            caller = System.IO.Path.GetFileName(caller);
-            LogManager.Configuration.Variables["file"] = caller;
-            LogManager.Configuration.Variables["line"] = lineNumber.ToString();
+            _file = System.IO.Path.GetFileName(caller);
+            //LogManager.Configuration.Variables["file"] = caller;
+            //LogManager.Configuration.Variables["line"] = lineNumber.ToString();
+            _line = lineNumber.ToString();
             return this;
         }
 
         void ILogHelper.Trace(string msg, params object[] par)
         {
-            Log.Trace(msg.Replace(System.Environment.NewLine, "--"), par);
+            LogEnqueue(LogLevel.Trace, msg, par);
         }
 
         void ILogHelper.Debug(string msg, params object[] par)
         {
-            Log.Debug(msg.Replace(System.Environment.NewLine, "--"), par);
+            LogEnqueue(LogLevel.Debug, msg, par);
         }
 
         void ILogHelper.Info(string msg, params object[] par)
         {
-            Log.Info(msg.Replace(System.Environment.NewLine, "--"), par);
+            LogEnqueue(LogLevel.Info, msg, par);
         }
 
         void ILogHelper.Warn(string msg, params object[] par)
         {
-            Log.Warn(msg.Replace(System.Environment.NewLine, "--"), par);
+            LogEnqueue(LogLevel.Warn, msg, par);
         }
 
         void ILogHelper.Error(string msg, params object[] par)
         {
-            Log.Error(msg.Replace(System.Environment.NewLine, "--"), par);
+            LogEnqueue(LogLevel.Error, msg, par);
         }
 
         void ILogHelper.Fatal(string msg, params object[] par)
         {
-            Log.Fatal(msg.Replace(System.Environment.NewLine, "--"), par);
+            LogEnqueue(LogLevel.Fatal, msg, par);
         }
 
         void ILogHelper.TraceException(Exception x)
         {
-            Log.Log<Exception>(LogLevel.Trace, x);
+            LogEnqueue(LogLevel.Error, x.Message);
         }
+
+        #endregion
+
+        public LogHelper()
+        {
+            Task.Factory.StartNew(() =>
+            {
+                do
+                {
+                    dynamic logitem = null;
+
+                    lock (logitems)
+                    {
+                        if (logitems.Count > 0)
+                            logitem = logitems.Dequeue();
+                    }
+
+                    if (logitem != null)
+                        LogGenerate(logitem);
+
+                } while (taskfinalize.WaitOne(10) == false);
+            });
+        }
+
+        public void Dispose()
+        {
+            taskfinalize.Set();
+        }
+
+        #region private / protected
+
+        protected Logger Log = LogManager.GetLogger("RdMNService");
+        string _file;
+        string _line;
+        ManualResetEvent taskfinalize = new ManualResetEvent(false);
+        Queue<dynamic> logitems = new Queue<dynamic>();
+        void LogEnqueue(LogLevel level, string msg, params object[] par)
+        {
+            lock (logitems)
+            {
+                if (logitems.Count < 100)
+                {
+                    logitems.Enqueue(new { level, file = _file, line = _line, msg, par });
+                }
+            }
+        }
+        void LogGenerate(dynamic item)
+        {
+            LogManager.Configuration.Variables["file"] = item.file;
+            LogManager.Configuration.Variables["line"] = item.line;
+            Log.Log(item.level, item.msg.Replace(System.Environment.NewLine, "--"), item.par);
+        }
+
+        #endregion
+
     }
 }
