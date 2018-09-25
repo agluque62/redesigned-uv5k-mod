@@ -2,52 +2,80 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Net;
 using System.Threading.Tasks;
 
 using U5ki.Infrastructure;
+
+using uv5k_mn_mod.Servicios;
 
 namespace uv5k_mn_mod.Modelo
 {
     public class FreqDataItem
     {
-        public object Fid { get; set; }
-        public object Band { get; set; }
-        public object Priority { get; set; }
+        public dynamic Fid { get; set; }
+        public dynamic Band { get; set; }
+        public dynamic Priority { get; set; }
     }
 
-    public class RdEquipmentDataItem
+    public class RdEquipmentDataItem : IEquatable<RdEquipmentDataItem>, IEquatable<RdEquipmentStatus>
     {
-        public dynamic Id { get; set; }
+        public string Rid { get; set; }
 
         /** Configuration data */
-        public object Model { get; set; }
-        public object Site { get; set; }
-        public object Band { get; set; }
-        public object TxRx { get; set; }
-        public object MainOrStanby { get; set; }
-        public object MainFrequency { get; set; }
-        public object MainPower { get; set; }
-        public object MainModulationMode { get; set; }
-        public object MainCarrierOffset { get; set; }
-        public object MainChannelSpace { get; set; }
-        public object StandbyFrequeciesRange { get; set; }
+        public dynamic Model { get; set; }
+        public string Site { get; set; }
+        public dynamic Band { get; set; }
+        public dynamic TxRx { get; set; }
+        public dynamic MainOrStanby { get; set; }
+        public dynamic MainFrequency { get; set; }
+        public dynamic MainPower { get; set; }
+        public dynamic MainModulationMode { get; set; }
+        public dynamic MainCarrierOffset { get; set; }
+        public dynamic MainChannelSpace { get; set; }
+        public dynamic StandbyFrequeciesRange { get; set; }
 
         /** Remote control data */
-        public object RemoteControlEndp { get; set; }
-        public object RemoteControlBaseOid { get; set; }
-        public object RemoteControlManager { get; set; }
+        public IPEndPoint RemoteControlEndp { get; set; }
+        public string RemoteControlBaseOid { get; set; }
 
         /** Voip Configuration */
-        public object SipUri { get; set; }
+        public string SipUri { get; set; }
+
+        public bool Equals(RdEquipmentDataItem other) => Rid == other.Rid &&
+                Site == other.Site &&
+                Band == other.Band &&
+                TxRx == other.TxRx &&
+                MainOrStanby == other.MainOrStanby &&
+                MainFrequency == other.MainFrequency &&
+                MainPower == other.MainPower &&
+                MainModulationMode == other.MainModulationMode &&
+                MainCarrierOffset == other.MainCarrierOffset &&
+                MainChannelSpace == other.MainChannelSpace &&
+                StandbyFrequeciesRange == other.StandbyFrequeciesRange &&
+                RemoteControlEndp == RemoteControlEndp &&
+                RemoteControlBaseOid == other.RemoteControlBaseOid &&
+                SipUri == other.SipUri;
+
+        public bool Equals(RdEquipmentStatus other) => other.Rid == Rid;
     }
 
     public class RdEquipmentStatus
     {
-        public object Id { get; set; }
+        public dynamic Rid { get; set; }
 
-        public object IsAlive { get; set; }
-        public object IsOk { get; set; }
-        public object IsEnabled { get; set; }
+        public IRemoteControl RemoteControlManager { get; set; }
+        public dynamic IsAlive { get; set; }
+        public dynamic IsOk { get; set; }
+        public dynamic IsEnabled { get; set; }
+    }
+
+    public class RdAssignement
+    {
+        public dynamic Fid { get; set; }
+        public dynamic Rid { get; set; }
+        public dynamic Mode { get; set; }
+        public dynamic Prio { get; set; }
     }
 
 }

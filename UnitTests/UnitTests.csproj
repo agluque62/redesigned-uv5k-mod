@@ -56,7 +56,7 @@
     </Reference>
     <Reference Include="Utilities, Version=0.0.0.0, Culture=neutral, processorArchitecture=x86">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\AtVisualTeam\tools-ta\lib\Utilities.dll</HintPath>
+      <HintPath>..\Referencias\Utilities.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

@@ -319,7 +319,13 @@ namespace uv5k_mn_mod
         private void Configure(Cd40Cfg cfg)
         {
             log.From().Trace($"Configuring Service in Master={_master} State");
+
             // TODO... Configura el servicio interno...
+            IDataService ds = new DataService();
+            ds.Configure(cfg.Nodes, (res) =>
+            {
+
+            });
 
             //_Registry.SetValue<string>(MNManagerServiceTopic, "fromme", "Hola Hola");
             //_Registry.Publish();

@@ -89,4 +89,44 @@ namespace UnitTests
             }
         }
     }
+
+
+    [TestClass]
+    public class LinqTest
+    {
+        class ItemData
+        {
+            public string invariante { get; set; }
+            public string variante { get; set; }
+        }
+
+        List<ItemData> actual = new List<ItemData>()
+        {
+            new ItemData(){invariante="id01", variante = "01"},
+            new ItemData(){invariante="id02", variante = "02"},
+            new ItemData(){invariante="id03", variante = "03"},
+            new ItemData(){invariante="id04", variante = "04"},
+            new ItemData(){invariante="id05", variante = "05"},
+            new ItemData(){invariante="id06", variante = "06"},
+        };
+        List<ItemData> nueva = new List<ItemData>()
+        {
+            new ItemData(){invariante="id07", variante = "07"},
+            new ItemData(){invariante="id02", variante = "02"},
+            new ItemData(){invariante="id03", variante = "03"},
+            new ItemData(){invariante="id04", variante = "44"},
+            new ItemData(){invariante="id05", variante = "55"},
+            new ItemData(){invariante="id06", variante = "06"},
+        };
+
+        [TestMethod]
+        public void linqTest01()
+        {
+            var foradd = (from act in nueva
+                          join old in actual on act.invariante equals old.invariante into tmp1
+                          from item in tmp1.DefaultIfEmpty()
+                          select item).ToList();
+
+        }
+    }
 }
