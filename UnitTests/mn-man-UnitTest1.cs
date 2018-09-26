@@ -94,39 +94,91 @@ namespace UnitTests
     [TestClass]
     public class LinqTest
     {
-        class ItemData
+        class ItemData : IEquatable<ItemData>
         {
-            public string invariante { get; set; }
+            public string Id { get; set; }
             public string variante { get; set; }
+
+            public override bool Equals(object obj)
+            {
+                return Equals(obj as ItemData);
+            }
+
+            public override int GetHashCode()
+            {
+                return Id == null ? 0 : Id.GetHashCode();
+            }
+
+            public bool Equals(ItemData other)
+            {
+                return Id == other.Id && variante==other.variante;
+            }
         }
 
-        List<ItemData> actual = new List<ItemData>()
+        class ItemStatus
         {
-            new ItemData(){invariante="id01", variante = "01"},
-            new ItemData(){invariante="id02", variante = "02"},
-            new ItemData(){invariante="id03", variante = "03"},
-            new ItemData(){invariante="id04", variante = "04"},
-            new ItemData(){invariante="id05", variante = "05"},
-            new ItemData(){invariante="id06", variante = "06"},
+            public string Id { get; set; }
+            public bool Running { get; set; }
+            public bool Enabled { get; set; }
+        }
+
+        Dictionary<string, ItemData> Config = new  Dictionary<string, ItemData>
+        {
+            {"id01", new ItemData(){Id="id01", variante = "01"} },
+            {"id02", new ItemData(){Id="id02", variante = "02"} },
+            {"id03", new ItemData(){Id="id03", variante = "03"} },
+            {"id04", new ItemData(){Id="id04", variante = "04"} },
+            {"id05", new ItemData(){Id="id05", variante = "05"} },
+            {"id06", new ItemData(){Id="id06", variante = "06"} },
         };
-        List<ItemData> nueva = new List<ItemData>()
+        Dictionary<string, ItemStatus> Estado = new Dictionary<string, ItemStatus>();
+
+        List<ItemData> NuevaConfig = new List<ItemData>()
         {
-            new ItemData(){invariante="id07", variante = "07"},
-            new ItemData(){invariante="id02", variante = "02"},
-            new ItemData(){invariante="id03", variante = "03"},
-            new ItemData(){invariante="id04", variante = "44"},
-            new ItemData(){invariante="id05", variante = "55"},
-            new ItemData(){invariante="id06", variante = "06"},
+            new ItemData(){Id="id07", variante = "07"},
+            new ItemData(){Id="id02", variante = "02"},
+            new ItemData(){Id="id03", variante = "03"},
+            new ItemData(){Id="id04", variante = "44"},
+            new ItemData(){Id="id05", variante = "55"},
+            new ItemData(){Id="id06", variante = "06"},
         };
 
         [TestMethod]
-        public void linqTest01()
+        public void LinqTest01()
         {
-            var foradd = (from act in nueva
-                          join old in actual on act.invariante equals old.invariante into tmp1
-                          from item in tmp1.DefaultIfEmpty()
-                          select item).ToList();
+            /** Preparacion del Estado Inicial */
+            Estado = (from i in Config.Values
+                      select (new ItemStatus() { Id = i.Id, Enabled = true, Running = true }))
+                      .ToDictionary(g => g.Id, g => g);
+            /** No Modificado => disable */
+            Estado["id02"].Enabled = false;
+            /** Modificado => disable */
+            Estado["id04"].Enabled = false;
 
+
+            /** Recalcular la configuracion */
+            var comunes = Config.Values.Intersect(NuevaConfig).ToList();
+            var add = NuevaConfig.Except(comunes).ToList();                 // Para añadir (incluye los modificados)
+            var del = Config.Values.Except(comunes).ToList();               // Para borrar (incluye los modificados)
+            var mod = (from i1 in add                                       // Modificados (para salvar los estados de disable
+                      join i2 in del on i1.Id equals i2.Id
+                      select new { i1.Id, Estado[i1.Id].Enabled}).ToList();
+
+            /** Generar la nueva configuracion y estado */
+            del.ForEach(d =>
+            {
+                Config.Remove(d.Id);
+                Estado.Remove(d.Id);
+            });
+            add.ForEach(a => 
+            {
+                Config[a.Id] = a;
+                Estado[a.Id] = new ItemStatus() { Id = a.Id, Running = true, Enabled = true };
+            });
+            /** Recuperar el estado de los modificados.... */
+            mod.ForEach(m => Estado[m.Id].Enabled = m.Enabled);
+
+            /** Gestion de Asignaciones */
         }
     }
 }

@@ -11,12 +11,6 @@ using uv5k_mn_mod.Servicios;
 
 namespace uv5k_mn_mod.Modelo
 {
-    public class FreqDataItem
-    {
-        public dynamic Fid { get; set; }
-        public dynamic Band { get; set; }
-        public dynamic Priority { get; set; }
-    }
 
     public class RdEquipmentDataItem : IEquatable<RdEquipmentDataItem>, IEquatable<RdEquipmentStatus>
     {
@@ -26,9 +20,9 @@ namespace uv5k_mn_mod.Modelo
         public dynamic Model { get; set; }
         public string Site { get; set; }
         public dynamic Band { get; set; }
-        public dynamic TxRx { get; set; }
+        public bool TxRx { get; set; }
         public dynamic MainOrStanby { get; set; }
-        public dynamic MainFrequency { get; set; }
+        public string MainFrequency { get; set; }
         public dynamic MainPower { get; set; }
         public dynamic MainModulationMode { get; set; }
         public dynamic MainCarrierOffset { get; set; }
@@ -41,6 +35,18 @@ namespace uv5k_mn_mod.Modelo
 
         /** Voip Configuration */
         public string SipUri { get; set; }
+
+        /** Para las comparaciones al recargar */
+
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as RdEquipmentDataItem);
+        }
+
+        public override int GetHashCode()
+        {
+            return Rid == null ? 0 : (Rid + Site).GetHashCode();
+        }
 
         public bool Equals(RdEquipmentDataItem other) => Rid == other.Rid &&
                 Site == other.Site &&
@@ -70,12 +76,24 @@ namespace uv5k_mn_mod.Modelo
         public dynamic IsEnabled { get; set; }
     }
 
-    public class RdAssignement
+    public class FreqDataItem
     {
         public dynamic Fid { get; set; }
-        public dynamic Rid { get; set; }
-        public dynamic Mode { get; set; }
-        public dynamic Prio { get; set; }
+        public dynamic Band { get; set; }
+        public dynamic Priority { get; set; }
+    }
+
+    public class FreqDataAssign
+    {
+        public string Rid;
+        public string SipUri;
+    }
+
+    public class FreqDataStatus
+    {
+        public string Fid { get; set; }
+        public Dictionary<string, FreqDataAssign> Rx { get; set; }
+        public Dictionary<string, FreqDataAssign> Tx { get; set; }
     }
 
 }
