@@ -21,8 +21,9 @@ namespace uv5k_mn_mod.Modelo
         public string Site { get; set; }
         public dynamic Band { get; set; }
         public bool TxRx { get; set; }
-        public dynamic MainOrStanby { get; set; }
+        public dynamic MainOrStandby { get; set; }
         public string MainFrequency { get; set; }
+        public dynamic MainPriority { get; set; }
         public dynamic MainPower { get; set; }
         public dynamic MainModulationMode { get; set; }
         public dynamic MainCarrierOffset { get; set; }
@@ -52,7 +53,7 @@ namespace uv5k_mn_mod.Modelo
                 Site == other.Site &&
                 Band == other.Band &&
                 TxRx == other.TxRx &&
-                MainOrStanby == other.MainOrStanby &&
+                MainOrStandby == other.MainOrStandby &&
                 MainFrequency == other.MainFrequency &&
                 MainPower == other.MainPower &&
                 MainModulationMode == other.MainModulationMode &&
@@ -76,24 +77,28 @@ namespace uv5k_mn_mod.Modelo
         public dynamic IsEnabled { get; set; }
     }
 
-    public class FreqDataItem
-    {
-        public dynamic Fid { get; set; }
-        public dynamic Band { get; set; }
-        public dynamic Priority { get; set; }
-    }
-
-    public class FreqDataAssign
-    {
-        public string Rid;
-        public string SipUri;
-    }
-
-    public class FreqDataStatus
+    public class FreqDataItemAssign
     {
         public string Fid { get; set; }
-        public Dictionary<string, FreqDataAssign> Rx { get; set; }
-        public Dictionary<string, FreqDataAssign> Tx { get; set; }
+        public dynamic Band { get; set; }
+        public dynamic Priority { get; set; }
+        public string Site { get; set; }
+        public bool TxOrRx { get; set; }
+        public string DefaultRid { get; set; }
+        public string ActualRid { get; set; }
     }
+
+    //public class FreqDataAssign
+    //{
+    //    public string Rid;
+    //    public string SipUri;
+    //}
+
+    //public class FreqDataStatus
+    //{
+    //    public string Fid { get; set; }
+    //    public Dictionary<string, FreqDataAssign> Rx { get; set; }
+    //    public Dictionary<string, FreqDataAssign> Tx { get; set; }
+    //}
 
 }
