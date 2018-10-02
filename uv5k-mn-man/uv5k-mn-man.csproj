@@ -38,6 +38,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Referencias\protobuf-net.dll</HintPath>
     </Reference>
+    <Reference Include="SharpSnmpLib">
+      <HintPath>..\Referencias\SharpSnmpLib.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
@@ -70,6 +73,8 @@
     <Compile Include="Servicios\RemoteControl\IRemoteControl.cs" />
     <Compile Include="Servicios\MNManager.cs" />
     <Compile Include="Helpers\TestingRoutines.cs" />
+    <Compile Include="Servicios\RemoteControl\RCNDFSimulado.cs" />
+    <Compile Include="Servicios\RemoteControl\SnmpInterfaz.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="NLog.config">

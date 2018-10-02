@@ -37,8 +37,28 @@ namespace uv5k_mn_mod.Modelo
         /** Voip Configuration */
         public string SipUri { get; set; }
 
-        /** Para las comparaciones al recargar */
+        public RdEquipmentDataItem() { }
+        public RdEquipmentDataItem(RdEquipmentDataItem o)
+        {
+            Rid = o.Rid;
+            Model = o.Model;
+            Site = o.Site;
+            Band = o.Band;
+            TxRx = o.TxRx;
+            MainOrStandby = o.MainOrStandby;
+            MainFrequency = o.MainFrequency;
+            MainPriority = o.MainPriority;
+            MainPower = o.MainPower;
+            MainModulationMode = o.MainModulationMode;
+            MainCarrierOffset = o.MainCarrierOffset;
+            MainChannelSpace = o.MainChannelSpace;
+            StandbyFrequeciesRange = o.StandbyFrequeciesRange;
+            RemoteControlEndp = o.RemoteControlEndp;
+            RemoteControlBaseOid = o.RemoteControlBaseOid;
+            SipUri = o.SipUri;
+        }
 
+        /** Para las comparaciones al recargar */
         public override bool Equals(object obj)
         {
             return Equals(obj as RdEquipmentDataItem);
@@ -72,9 +92,12 @@ namespace uv5k_mn_mod.Modelo
         public dynamic Rid { get; set; }
 
         public IRemoteControl RemoteControlManager { get; set; }
+        public string RemoteControlBaseOid { get; set; }
+
         public dynamic IsAlive { get; set; }
         public dynamic IsOk { get; set; }
         public dynamic IsEnabled { get; set; }
+        public dynamic IsOperative { get; set; }
     }
 
     public class FreqDataItemAssign

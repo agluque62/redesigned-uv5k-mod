@@ -11,6 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Referencias", "Referencias"
 	ProjectSection(SolutionItems) = preProject
 		Referencias\libspread.dll = Referencias\libspread.dll
 		Referencias\protobuf-net.dll = Referencias\protobuf-net.dll
+		Referencias\SharpSnmpLib.dll = Referencias\SharpSnmpLib.dll
 		Referencias\U5ki.Infrastructure.dll = Referencias\U5ki.Infrastructure.dll
 		Referencias\u5ki.RemoteControlService.dll = Referencias\u5ki.RemoteControlService.dll
 		Referencias\Utilities.dll = Referencias\Utilities.dll
