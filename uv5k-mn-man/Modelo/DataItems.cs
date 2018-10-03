@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 using U5ki.Infrastructure;
 
-using uv5k_mn_mod.Servicios;
+using uv5k_mn_mod.Servicios.RemoteControl;
 
 namespace uv5k_mn_mod.Modelo
 {

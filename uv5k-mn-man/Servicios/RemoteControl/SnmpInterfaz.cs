@@ -13,6 +13,7 @@ using Lextm.SharpSnmpLib.Pipeline;
 
 namespace uv5k_mn_mod.Servicios.RemoteControl
 {
+    public enum SnmpInterfazResult { Ok, Timeout, Error }
     public class SnmpInterfazTimeoutException : ApplicationException
     {
         public SnmpInterfazTimeoutException(string msg) : base(msg)
@@ -29,29 +30,28 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
 
     public class SnmpInterfaz
     {
-        public SnmpInterfaz(int port=161, string community="public", int timeout=1000, int reint= 2)
+        public SnmpInterfaz(string community="public", int timeout=1000, int reint= 2)
         {
             Timeout = timeout;
             Reint = reint;
-            Port = port;
             Community = community;
         }
 
-        public void Get(string ip, IList<Variable> _data,
-            Action<bool, IPEndPoint, IList<Variable>, Exception> handler)
+        public void Get(IPEndPoint endp, IList<Variable> _data,
+            Action<SnmpInterfazResult, IPEndPoint, IList<Variable>, Exception> handler)
         {
             int reint = Reint;
             do
             {
                 try
                 {
-                    IList<Variable> results = Messenger.Get(VersionCode.V2, new IPEndPoint(IPAddress.Parse(ip), Port),
+                    IList<Variable> results = Messenger.Get(VersionCode.V2, endp,
                                                 new OctetString(Community), _data, Timeout);
 
                     if (results.Count != _data.Count)
-                        throw new SnmpInterfazInternalErrorException($"SnmpClient.GetSet[{ip}]: Invalid result.count");
+                        throw new SnmpInterfazInternalErrorException($"SnmpClient.GetSet[{endp}]: Invalid result.count");
 
-                    handler(true, new IPEndPoint(IPAddress.Parse(ip), Port), results, null);
+                    handler(SnmpInterfazResult.Ok, endp, results, null);
                     return;
                 }
 
@@ -62,30 +62,30 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
 
                 catch (Exception x)
                 {
-                    handler(false, null, null, x);
+                    handler(SnmpInterfazResult.Error, null, null, x);
                     return;
                 }
 
             } while (--reint > 0);
 
-            throw new SnmpInterfazTimeoutException(String.Format("SnmpClient.GetSet[{0}]: No responde...", ip));
+            handler(SnmpInterfazResult.Timeout, null, null, new SnmpInterfazTimeoutException($"SnmpClient.Get[{endp}]: No responde..."));
         }
 
-        public void Set(string ip, IList<Variable> _data,
-            Action<bool, IPEndPoint, IList<Variable>, Exception> handler)
+        public void Set(IPEndPoint endp, IList<Variable> _data,
+            Action<SnmpInterfazResult, IPEndPoint, IList<Variable>, Exception> handler)
         {
             int reint = Reint;
             do
             {
                 try
                 {
-                    IList<Variable> results = Messenger.Set(VersionCode.V2, new IPEndPoint(IPAddress.Parse(ip), Port),
+                    IList<Variable> results = Messenger.Set(VersionCode.V2, endp,
                                                 new OctetString(Community), _data, Timeout);
 
                     if (results.Count != _data.Count)
-                        throw new SnmpInterfazInternalErrorException($"SnmpClient.Set[{ip}]: Invalid result.count");
+                        throw new SnmpInterfazInternalErrorException($"SnmpClient.Set[{endp}]: Invalid result.count");
 
-                    handler(true, new IPEndPoint(IPAddress.Parse(ip), Port), results, null);
+                    handler(SnmpInterfazResult.Ok, endp, results, null);
                     return;
                 }
 
@@ -96,16 +96,17 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
 
                 catch (Exception x)
                 {
-                    handler(false, null, null, x);
+                    handler(SnmpInterfazResult.Error, null, null, x);
                     return;
                 }
 
             } while (--reint > 0);
 
-            throw new SnmpInterfazTimeoutException(String.Format("SnmpClient.Set[{0}]: No responde...", ip));
+            handler(SnmpInterfazResult.Timeout, null, null, 
+                new SnmpInterfazTimeoutException($"SnmpClient.Set[{endp}]: No responde..."));
         }
 
-        public void GetInt(string ip, string oid, Action<bool, int, Exception> handler)
+        public void GetInt(IPEndPoint endp, string oid, Action<SnmpInterfazResult, int, Exception> handler)
         {
             try
             {
@@ -113,28 +114,28 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 {
                     new Variable(new ObjectIdentifier(oid))
                 };
-                Get(ip, lst, (ok, ep, res, x) =>
+                Get(endp, lst, (res, ep, val, x) =>
                 {
-                    if (ok)
+                    if (res==SnmpInterfazResult.Ok)
                     {
                         int _ret = 0;
-                        if (int.TryParse(res[0].Data.ToString(), out _ret) == false)
+                        if (int.TryParse(val[0].Data.ToString(), out _ret) == false)
                             throw new SnmpInterfazInternalErrorException($"CienteSnmp.GetInt: TryParse(result[0].Data.ToString(): {ip}---{oid}");
-                        handler(true, _ret, null);
+                        handler(res, _ret, null);
                     }
                     else
                     {
-                        handler(false, 0, x);
+                        handler(res, 0, x);
                     }
                 });
             }
             catch (Exception x)
             {
-                handler(false, 0, x);
+                handler(SnmpInterfazResult.Error, 0, x);
             }
         }
 
-        public void SetInt(string ip, string oid, int valor, Action<bool, Exception> handler)
+        public void SetInt(IPEndPoint endp, string oid, int valor, Action<SnmpInterfazResult, Exception> handler)
         {
             try
             {
@@ -142,18 +143,18 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 {
                     new Variable(new ObjectIdentifier(oid), new Integer32(valor))
                 };
-                Set(ip, lst, (ok, ep, res, x) =>
+                Set(endp, lst, (res, ep, val, x) =>
                 {
-                    handler(ok, x);
+                    handler(res, x);
                 });
             }
             catch (Exception x)
             {
-                handler(false, x);
+                handler(SnmpInterfazResult.Error, x);
             }
         }
 
-        public void GetString(string ip, string oid, Action<bool, string, Exception> handler)
+        public void GetString(IPEndPoint endp, string oid, Action<SnmpInterfazResult, string, Exception> handler)
         {
             try
             {
@@ -162,25 +163,18 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                     new Variable(new ObjectIdentifier(oid))
                 };
 
-                Get(ip, lst, (ok, ep, res, x) =>
+                Get(endp, lst, (res, ep, val, x) =>
                 {
-                    if (ok)
-                    {
-                        handler(true, res[0].Data.ToString(), null);
-                    }
-                    else
-                    {
-                        handler(false, null, x);
-                    }
+                    handler(res, res == SnmpInterfazResult.Ok ? val[0].Data.ToString() : string.Empty, x);
                 });
             }
             catch (Exception x)
             {
-                handler(false, null, x);
+                handler(SnmpInterfazResult.Error, null, x);
             }
         }
 
-        public void SetString(string ip, string oid, String valor, Action<bool, Exception> handler)
+        public void SetString(IPEndPoint endp, string oid, String valor, Action<SnmpInterfazResult, Exception> handler)
         {
             try
             {
@@ -188,14 +182,14 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 {
                     new Variable(new ObjectIdentifier(oid), new OctetString(valor))
                 };
-                Set(ip, lst, (ok, ep, res, x) =>
+                Set(endp, lst, (res, ep, val, x) =>
                 {
-                    handler(ok, x);
+                    handler(res, x);
                 });
             }
             catch (Exception x)
             {
-                handler(false, x);
+                handler(SnmpInterfazResult.Error, x);
             }
         }
 
@@ -219,7 +213,6 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
 
         protected int Timeout { get; set; }
         protected int Reint { get; set; }
-        protected int Port { get; set; }
         protected string Community { get; set; }
     }
 }
