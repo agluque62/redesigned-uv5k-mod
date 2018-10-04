@@ -180,6 +180,59 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
 
         }
 
+        public void Get(IPEndPoint endp, Dictionary<string, object> set, Action<SnmpInterfazResult, Object, Exception> handler)
+        {
+            try
+            {
+                var lst = new List<Variable>();
+                foreach(var item in set)
+                {
+                    lst.Add(new Variable(new ObjectIdentifier(item.Key)));
+                }
+                Get(endp, lst, (res, ep, val, x) =>
+                {
+                    if (res == SnmpInterfazResult.Ok)
+                    {
+                        if (val.Count == set.Count)
+                        {
+                            foreach(var ret in val)
+                            {
+                                string oid = ret.Id.ToString();
+                                object data = null;
+
+                                if (ret.Data is OctetString)
+                                    data = ret.Data.ToString();
+                                else if (ret.Data is Integer32)
+                                    data = (ret.Data as Integer32).ToInt32();
+
+                                if (set.ContainsKey(oid))
+                                {
+                                    set[ret.Id.ToString()] = data;
+                                }
+                                else
+                                {
+                                    // TODO. ERROR
+                                }
+                            }
+                            handler(SnmpInterfazResult.Ok, set, null);
+                        }
+                        else
+                        {
+                            handler(SnmpInterfazResult.Error, null, new System.IO.InvalidDataException("SNMP. No se han obtenido todos los valores."));
+                        }
+                    }
+                    else
+                    {
+                        handler(res, null, x);
+                    }
+                });
+            }
+            catch (Exception x)
+            {
+                handler(SnmpInterfazResult.Error, null, x);
+            }
+        }
+
         //public void TrapTo(string ipTo, int port, string community, string oid, string val)
         //{
         //    List<Variable> lst = new List<Variable>();

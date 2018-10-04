@@ -1,56 +1,28 @@
-﻿using Lextm.SharpSnmpLib;
-// using NLog;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
-using U5ki.Enums;
-using U5ki.Infrastructure;
-using U5ki.Infrastructure.Code;
-using U5ki.Infrastructure.Resources;
-using Utilities;
 
-using Translate;
 
-namespace u5ki.RemoteControlService
+using uv5k_mn_mod.Modelo;
+
+
+namespace uv5k_mn_mod.Servicios.RemoteControl
 {
     /// <summary>
     /// Esta es la clase que engloba la funcionalidad principal del telemando de Jotron modelo 7000.
     /// </summary>
-    class RCJotron7000 : BaseCode, IRemoteControl
+    class RCJotron7000 : IRemoteControl
     {
-
-        #region Declarations
-
-        public readonly Int32 Port = 160;
-
-        public readonly String Community = "public";
-        public readonly Int32 SessionTimeout = 999;
-        public readonly VersionCode SNMPVersion = VersionCode.V1;
-        public readonly Int32 SNMPCallTimeout = 500; // Miliseconds = 1,0 seconds antes 0,5
-        public readonly Int32 NUMMAXTimeout = 1;
-        // JOI: 20171031 ERROR #3231 
-        public readonly Int32 PowerLevelMin = 300;
-        public readonly Int32 PowerLevelMax = 470;
-        public readonly Int32 PowerLevelDefault = 470;
-        // JOI: 20171031 ERROR #3231
-        // private static Logger _logger = LogManager.GetCurrentClassLogger();
-        public string Name { get { return U5ki.Infrastructure.Resources.ServiceNames.RemoteControlService; } }
-        private Action<GearOperationStatus> _response;
-        private Action<String> _responseString;
-        private Thread _thread;
-        /// <summary>
-        /// Variable para control de las excecpciones. Se utiliza para evitar que cada iteracion/comprobación que un equipo no este respondiendo, 
-        /// no genere continuamente eventos de historico, solo la primera vez.
-        /// </summary>
-        IDictionary<String, Type> _lastExceptions = new Dictionary<String, Type>();
+        #region Enums
         //JOI
-        enum GearCarrierOffStatusJotron
+        enum JotronCarrierOffStatusValues
         {
             Off = 7,
             kHz_7_5 = 12,
@@ -68,7 +40,7 @@ namespace u5ki.RemoteControlService
             kHz_minus_7_3 = 3
         }
 
-        enum GearModulationsJotron
+        enum JotronModulationsValues
         {
             AM = 1,
             AMMSK = 2,
@@ -77,14 +49,14 @@ namespace u5ki.RemoteControlService
             DSC = 5
         }
 
-        enum GearEventLevelJotron
+        enum JotronEventLevelValues
         {
             jt_Ok = 0,
             jt_Warning = 1,
             jt_Error = 2
         }
 
-        enum GearIndexOperationalState
+        enum JotronIndexOperationalStateValues
         {
 
             keyInp = 0,                 //There is an active key input to the radio (tx) or the txBusy input is low (rx)
@@ -108,11 +80,12 @@ namespace u5ki.RemoteControlService
             telsaBusy = 18              //The radio has enabled Telsa filter, and Telsafilter is not ready/cmd not present.
         }
 
-        enum GearNumParamOperationalState
+        enum JotronNumParamOperationalStateValues
         {
-            jt_NumParamOk = 2         
+            jt_NumParamOk = 2
         }
-        enum GearOperMode
+
+        enum JotronOperModeValues
         {
             jt_reset = 1,
             jt_main = 2,
@@ -121,56 +94,211 @@ namespace u5ki.RemoteControlService
             test = 5 // Do not use (internal)
         }
 
-        enum GearForceLowPower
-        {
-            jt_true = 1,
-            jt_false = 2
-             
-        }
-
-        enum GearInServiceMode
+        enum JotronForceLowPowerValues
         {
             jt_true = 1,
             jt_false = 2
 
         }
-        enum GearChannelSpacingsJotorn
+
+        enum JotronInServiceModeValues
+        {
+            jt_true = 1,
+            jt_false = 2
+
+        }
+
+        enum JotronChannelSpacingsValues
         {
             jt_kHz_8_33 = 1,
             jt_kHz_25_00 = 2
         }
 
-        enum GearAnalogInputModulationSourceTx
+        enum JotronAnalogInputModulationSourceTxValues
         {
-            jt_AIMST_Auto   = 1,
-            jt_AIMST_LineIn   = 2,
-            jt_AIMST_Mic   = 3,
-            jt_AIMST_ModGen   = 4,
-            jt_AIMST_VoIP   = 5
+            jt_AIMST_Auto = 1,
+            jt_AIMST_LineIn = 2,
+            jt_AIMST_Mic = 3,
+            jt_AIMST_ModGen = 4,
+            jt_AIMST_VoIP = 5
         }
 
+        #endregion Enums.
+
+        #region Sesion Snmp
+
+        /** */
+        class JotronSnmpSession : GenericSnmpSession
+        {
+            const Int32 DelaySetFrequencyMs = 1000;
+
+            const string DeviceStatusOid = "1.3.6.1.4.1.22154.3.1.2.3.2.0";             //	OctectString.       "grDevStat
+            const string FrequencyOid = "1.3.6.1.4.1.22154.3.1.2.3.4.0";                //	Inteqer32.          "ffFreq
+            const string CarrierOffStatusOid = "1.3.6.1.4.1.22154.3.1.2.3.6.0";         //	Integer32.          "ffCarrOffst
+            const string ChannelSpacingOid = "1.3.6.1.4.1.22154.3.1.2.3.23.0";          //	Integer32.          "ffChSpc
+            const string ModulationOid = "1.3.6.1.4.1.22154.3.1.2.3.9.0";               //  Integer32.           ffMode
+
+            const string InServiceModeOid = "1.3.6.1.4.1.22154.3.1.2.3.21.0";           //	Integer32.          bsInServiceMode true(1) false(2) 
+            const string OperationalModeOid = "1.3.6.1.4.1.22154.3.1.2.3.1.0";          //  ???
+            const string OperationalStatusATCOid = "1.3.6.1.4.1.2363.6.1.1.6.0";        //  OctectString
+            const string RequestFrecuencyOid = "1.3.6.1.4.1.22154.3.1.2.3.3.0";         //  ???
+            const string TxAnaModSourceOid = "1.3.6.1.4.1.22154.3.1.2.2.1.2.2.0";       //	Integer32. Defines the analog modulation input source.Auto(1), Line In(2), Mic(3), ModGen(4), Voip(5).
+            const string TxPowerModeOid = "1.3.6.1.4.1.22154.3.1.2.3.14.0";             // 	???                 bsForceLowPower true(1) false (2)
+
+
+            const string OID_EUROCONTROL_VOSIPSESSIONLIST = "1.3.6.1.4.1.2363.6.1.1.8.0";           // OctectString
+            const string OID_JOTRON_ALARMAS_PERMANENTES_TX = "1.3.6.1.4.1.22154.3.1.2.5.1.6.0";     // OctectString
+            const string OID_JOTRON_ALARMAS_PERMANENTES_RX = "1.3.6.1.4.1.22154.3.1.2.5.2.6.0";     // OctectString
+            const string OID_JOTRON_TXAMPOWERFINE = "1.3.6.1.4.1.22154.3.1.2.2.1.4.4.0";            // OctectString,  The carrier output power in dBm x 10 (0.1 dB resolution) min  300 max 470.
+
+            #region Override
+
+            private RdEquipmentStatus _status = RdEquipmentStatus.NotPresent;
+            public override RdEquipmentStatus Status
+            {
+                get
+                {
+                    snmpi.Get<int>(TargetEndp, DeviceStatusOid + OidBase, (res, val, x) =>
+                    {
+                        SessionErrorsTreatment("Status Get", res, x);
+                        if (SessionErrors.Count == 0)
+                        {
+                            int ival = (int)val;
+                            switch (ival)
+                            {
+                                case 0:
+                                    _status = RdEquipmentStatus.FailLocal;
+                                    break;
+                                case 1:
+                                    _status = RdEquipmentStatus.Ready;
+                                    break;
+                                case 2:
+                                    _status = RdEquipmentStatus.Fail;
+                                    break;
+                                case 3:
+                                    System.Threading.Thread.Sleep(1000);
+                                    _status = RdEquipmentStatus.NotPresent;
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    });
+                    return _status;
+                }
+            }
+
+            public override string Frequency
+            {
+                get
+                {
+                    return GetValue<string>("Frequency get", FrequencyOid) as string;
+                }
+                set
+                {
+                    SetValue<string>("Frequency set", FrequencyOid, value);
+                }
+            }
+
+            public override int? CarrierOffset
+            {
+                get
+                {
+                    return GetValue<int?>("CarrierOffset get", CarrierOffStatusOid) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("CarrierOffset set", CarrierOffStatusOid, value);
+                }
+            }
+
+            public override int? ChannelSpacing
+            {
+                get
+                {
+                    return GetValue<int?>("ChannelSpacingOid get", ChannelSpacingOid) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("ChannelSpacingOid set", ChannelSpacingOid, value);
+                }
+            }
+
+            public override int? Modulation
+            {
+                get
+                {
+                    return GetValue<int?>("ModulationOid get", ModulationOid) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("ModulationOid set", ModulationOid, value);
+                }
+            }
+
+            public override int? Power
+            {
+                get
+                {
+                    return GetValue<int?>("TxPowerOid get", TxPowerModeOid) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("TxPowerOid set", TxPowerModeOid, value);
+                }
+            }
+
+            #endregion
+
+            public JotronSnmpSession(IPEndPoint endp, string rid) : base()
+            {
+                TargetEndp = endp;
+                Rid = rid;
+                SessionErrors = new List<dynamic>();
+            }
+        }
+
+        #endregion Sesion SNMP
+
+        #region Declarations
+
+        public readonly Int32 Port = 160;
+
+        public readonly String Community = "public";
+        public readonly Int32 SessionTimeout = 999;
+        //public readonly VersionCode SNMPVersion = VersionCode.V1;
+        public readonly Int32 SNMPCallTimeout = 500; // Miliseconds = 1,0 seconds antes 0,5
+        public readonly Int32 NUMMAXTimeout = 1;
+        // JOI: 20171031 ERROR #3231 
+        public readonly Int32 PowerLevelMin = 300;
+        public readonly Int32 PowerLevelMax = 470;
+        public readonly Int32 PowerLevelDefault = 470;
+        // JOI: 20171031 ERROR #3231
+
+        // private static Logger _logger = LogManager.GetCurrentClassLogger();
+        //public string Name { get { return U5ki.Infrastructure.Resources.ServiceNames.RemoteControlService; } }
+        //private Action<GearOperationStatus> _response;
+        //private Action<String> _responseString;
+        //private Thread _thread;
+        
+
         //JOI. CONTROL_ALARMAS_PERMANENTES
-        private bool bcontrol_alarmas_permanentes = u5ki.RemoteControlService.Properties.Settings.Default.ControlAlarmasPermanentes;
+        private bool bcontrol_alarmas_permanentes = true;   // TODO... u5ki.RemoteControlService.Properties.Settings.Default.ControlAlarmasPermanentes;
         //JOI. CONTROL_ALARMAS_PERMANENTES FIN
 
         // JOI. CONTROL_SIP
-        private bool bcontrol_sip = u5ki.RemoteControlService.Properties.Settings.Default.ControlSessionSIP;
-        const string OID_EUROCONTROL_VOSIPSESSIONLIST = "1.3.6.1.4.1.2363.6.1.1.8.0";
-        private string sipNdbx { get { return Properties.Settings.Default.SipUser + "@" + Properties.Settings.Default.SipIp; } }
+        private bool bcontrol_sip = true;                   // TODO... u5ki.RemoteControlService.Properties.Settings.Default.ControlSessionSIP;
+        private string sipNdbx = "user@127.0.0.1";          // TODO... { get { return Properties.Settings.Default.SipUser + "@" + Properties.Settings.Default.SipIp; } }
         // JOI. CONTROL_SIP FIN.
  
         // JOI. CONTROL_EQUIPO_EN_ALARMA.(20170616)
-        const string OID_JOTRON_ALARMAS_PERMANENTES_TX = "1.3.6.1.4.1.22154.3.1.2.5.1.6.0";
-        const string OID_JOTRON_ALARMAS_PERMANENTES_RX = "1.3.6.1.4.1.22154.3.1.2.5.2.6.0";
         // JOI. CONTROL_EQUIPO_EN_ALARMA FIN.
 
         // JOI: 20171031 ERROR #3231 
-        //The carrier output power in dBm x 10 (0.1 dB resolution) min  300 max 470.
-        const string OID_JOTRON_TXAMPOWERFINE = "1.3.6.1.4.1.22154.3.1.2.2.1.4.4.0";
         // JOI: 20171031 ERROR #3231
- 
+
         // JOI. CONTROL_SET_SIP
-        private int delaySetFrequencyMs = Convert.ToInt32(u5ki.RemoteControlService.Properties.Settings.Default.DelaySetFrequencyMs);
+        private int delaySetFrequencyMs = 1500;     // TODO... Convert.ToInt32(u5ki.RemoteControlService.Properties.Settings.Default.DelaySetFrequencyMs);
         // JOI. CONTROL_SET_SIP FIN.
         //JOI FIN
         #endregion
@@ -189,6 +317,7 @@ namespace u5ki.RemoteControlService
         {
             Port = port;
         }
+
         /// <summary>
         /// 
         /// </summary>
@@ -202,35 +331,6 @@ namespace u5ki.RemoteControlService
 
         #region Logic
 
-#if DEBUG
-        /// <summary>
-        /// Usado exclusivamente para el emulador de prueba. 
-        /// Como se puede ver este codigo en RELEASE desaparecera.
-        /// </summary>
-        private void RandomBehaviour(BaseNode node)
-        {
-            Random random = new Random((int)DateTime.Now.Ticks);
-
-            Int32 number = random.Next(5, 50);
-            if (DateTime.Now > node.LastStatusModification.AddSeconds(number))
-            {
-                node.LastStatusModification = DateTime.Now;
-                _response.Invoke(GearOperationStatus.OK);
-                return;
-            }
-
-            number = random.Next(1, Globals.Test.RandomBehaviourProbability);
-            if (number == 1)
-            {
-                if (Convert.ToBoolean(random.Next(0, 1)))
-                    _response.Invoke(GearOperationStatus.Fail);
-                else
-                    _response.Invoke(GearOperationStatus.Timeout);
-            }
-            else
-                _response.Invoke(GearOperationStatus.OK);
-        }
-#endif
 
         #region Logic - IRemoteControl
 
@@ -533,7 +633,10 @@ namespace u5ki.RemoteControlService
                 ((BaseNode)input).Power = Power;
         }
         // JOI: 20171031 ERROR #3231        
-        #region Logic - SNMP Conexion
+        
+            
+       
+            #region Logic - SNMP Conexion
 
         /// <summary>
         /// Funcion para agrupar la gestion de excepciones de las conexion SNMP
@@ -607,10 +710,7 @@ namespace u5ki.RemoteControlService
             return GearOperationStatus.Fail;
 
         }
-        /// <summary>
-        /// 
-        /// </summary>
-
+        
         /// <summary>
         /// Obtiene el estado del equipo. 
         /// Devuelve 19 valores en 0s y 1s que son booleanos sobre diferentes variables de estado del equipo. 
@@ -681,16 +781,16 @@ namespace u5ki.RemoteControlService
                     SNMPVersion);
                     // Parse the response
                     String[] parsedValue = valueOpStatATC.Split(',');
-                    GearNumParamOperationalState nparams = (GearNumParamOperationalState)Enum.Parse(typeof(GearNumParamOperationalState), parsedValue[0]);
-                    if (nparams != GearNumParamOperationalState.jt_NumParamOk)
+                    JotronNumParamOperationalStateValues nparams = (JotronNumParamOperationalStateValues)Enum.Parse(typeof(JotronNumParamOperationalStateValues), parsedValue[0]);
+                    if (nparams != JotronNumParamOperationalStateValues.jt_NumParamOk)
                         return GearOperationStatus.Fail;
 
                     GearActivationCommand command = (GearActivationCommand)Enum.Parse(typeof(GearActivationCommand), parsedValue[1]);
-                    GearEventLevelJotron state = (GearEventLevelJotron)Enum.Parse(typeof(GearEventLevelJotron), parsedValue[2]);
+                    JotronEventLevelValues state = (JotronEventLevelValues)Enum.Parse(typeof(JotronEventLevelValues), parsedValue[2]);
 
                     if (
                         command == GearActivationCommand.NoGo ||
-                        state == GearEventLevelJotron.jt_Error
+                        state == JotronEventLevelValues.jt_Error
                         )
                         return GearOperationStatus.Fail;
 
@@ -703,7 +803,7 @@ namespace u5ki.RemoteControlService
                         SNMPCallTimeout,
                         Port,
                         SNMPVersion);
-                    if (InServiceMode == (Int32)GearInServiceMode.jt_true)
+                    if (InServiceMode == (Int32)JotronInServiceModeValues.jt_true)
                         return GearOperationStatus.Fail;
 
                     if (isEmitter)
@@ -716,7 +816,7 @@ namespace u5ki.RemoteControlService
                             SNMPCallTimeout,
                             Port,
                             SNMPVersion);
-                        if (iTxAnaModSource != (Int32)GearAnalogInputModulationSourceTx.jt_AIMST_Auto)
+                        if (iTxAnaModSource != (Int32)JotronAnalogInputModulationSourceTxValues.jt_AIMST_Auto)
                             return GearOperationStatus.Fail;
                     }
 
@@ -1022,7 +1122,7 @@ namespace u5ki.RemoteControlService
         /// <param name="modulation"></param>
         /// <param name="targetIp"></param>
         /// <returns></returns>
-        private GearChannelSpacingsJotorn ConvertChannelSpacingSet(GearChannelSpacings channelSpacing, String targetIp)
+        private JotronChannelSpacingsValues ConvertChannelSpacingSet(GearChannelSpacings channelSpacing, String targetIp)
         {
 
             String logMethod = "CNV CHANNEL SPACING SET";
@@ -1032,21 +1132,23 @@ namespace u5ki.RemoteControlService
                 switch (channelSpacing)
                 {
                     case GearChannelSpacings.kHz_8_33:
-                        return GearChannelSpacingsJotorn.jt_kHz_8_33;
+                        return JotronChannelSpacingsValues.jt_kHz_8_33;
                     case GearChannelSpacings.kHz_25_00:
-                        return GearChannelSpacingsJotorn.jt_kHz_25_00;
+                        return JotronChannelSpacingsValues.jt_kHz_25_00;
                     default:
-                        return GearChannelSpacingsJotorn.jt_kHz_25_00;
+                        return JotronChannelSpacingsValues.jt_kHz_25_00;
                 }
             }
 
             catch (Exception ex)
             {
                 LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: Invalid" + ex + ". " + ToString(targetIp));
-                return GearChannelSpacingsJotorn.jt_kHz_25_00;
+                return JotronChannelSpacingsValues.jt_kHz_25_00;
             }
         }
+
         ////JOI FIN
+        
         /// <summary>
         /// 
         /// </summary>
@@ -1112,7 +1214,7 @@ namespace u5ki.RemoteControlService
         /// <param name="carrierOffstatus"></param>
         /// <param name="targetIp"></param>
         /// <returns></returns>
-        private GearCarrierOffStatusJotron ConvertCarrierOffsetJotron(GearCarrierOffStatus carrierOffstatus, String targetIp)
+        private JotronCarrierOffStatusValues ConvertCarrierOffsetJotron(GearCarrierOffStatus carrierOffstatus, String targetIp)
         {
 
 
@@ -1123,35 +1225,35 @@ namespace u5ki.RemoteControlService
                 switch (carrierOffstatus)
                 {
                     case GearCarrierOffStatus.Off:
-                        return GearCarrierOffStatusJotron.Off;
+                        return JotronCarrierOffStatusValues.Off;
                     case GearCarrierOffStatus.kHz_7_5:
-                        return GearCarrierOffStatusJotron.kHz_7_5;
+                        return JotronCarrierOffStatusValues.kHz_7_5;
                     case GearCarrierOffStatus.kHz_5_0:
-                        return GearCarrierOffStatusJotron.kHz_5_0;
+                        return JotronCarrierOffStatusValues.kHz_5_0;
                     case GearCarrierOffStatus.kHz_2_5:
-                        return GearCarrierOffStatusJotron.kHz_2_5;
+                        return JotronCarrierOffStatusValues.kHz_2_5;
                     case GearCarrierOffStatus.Hz_0_0:
-                        return GearCarrierOffStatusJotron.Hz_0_0;
+                        return JotronCarrierOffStatusValues.Hz_0_0;
                     case GearCarrierOffStatus.kHz_minus_2_5:
-                        return GearCarrierOffStatusJotron.kHz_minus_2_5;
+                        return JotronCarrierOffStatusValues.kHz_minus_2_5;
                     case GearCarrierOffStatus.kHz_minus_5_0:
-                        return GearCarrierOffStatusJotron.kHz_minus_5_0;
+                        return JotronCarrierOffStatusValues.kHz_minus_5_0;
                     case GearCarrierOffStatus.kHz_minus_7_5:
-                        return GearCarrierOffStatusJotron.kHz_minus_7_5;
+                        return JotronCarrierOffStatusValues.kHz_minus_7_5;
                     case GearCarrierOffStatus.kHz_8:
-                        return GearCarrierOffStatusJotron.kHz_8;
+                        return JotronCarrierOffStatusValues.kHz_8;
                     case GearCarrierOffStatus.kHz_4:
-                        return GearCarrierOffStatusJotron.kHz_4;
+                        return JotronCarrierOffStatusValues.kHz_4;
                     case GearCarrierOffStatus.kHz_minus_4:
-                        return GearCarrierOffStatusJotron.kHz_minus_4;
+                        return JotronCarrierOffStatusValues.kHz_minus_4;
                     case GearCarrierOffStatus.kHz_minus_8:
-                        return GearCarrierOffStatusJotron.kHz_minus_8;
+                        return JotronCarrierOffStatusValues.kHz_minus_8;
                     case GearCarrierOffStatus.kHz_7_3:
-                        return GearCarrierOffStatusJotron.kHz_7_3;
+                        return JotronCarrierOffStatusValues.kHz_7_3;
                     case GearCarrierOffStatus.kHz_minus_7_3:
-                        return GearCarrierOffStatusJotron.kHz_minus_7_3;
+                        return JotronCarrierOffStatusValues.kHz_minus_7_3;
                     default:
-                        return GearCarrierOffStatusJotron.Off;
+                        return JotronCarrierOffStatusValues.Off;
                 }
 
             }
@@ -1159,7 +1261,7 @@ namespace u5ki.RemoteControlService
             catch (Exception ex)
             {
                 LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: Invalid" + ex + ". " + ToString(targetIp));
-                return GearCarrierOffStatusJotron.Off;
+                return JotronCarrierOffStatusValues.Off;
             }
         }
         ////JOI FIN
@@ -1229,7 +1331,7 @@ namespace u5ki.RemoteControlService
         /// <param name="modulation"></param>
         /// <param name="targetIp"></param>
         /// <returns></returns>
-        private GearModulationsJotron ConvertModulationsJotron(GearModulations modulation, String targetIp)
+        private JotronModulationsValues ConvertModulationsJotron(GearModulations modulation, String targetIp)
         {
 
             String logMethod = "CNV MODULATION SET";
@@ -1239,18 +1341,18 @@ namespace u5ki.RemoteControlService
                 switch (modulation)
                 {
                     case GearModulations.AM:
-                        return GearModulationsJotron.AM;
+                        return JotronModulationsValues.AM;
                     case GearModulations.VDL2:
-                        return GearModulationsJotron.VDL2;
+                        return JotronModulationsValues.VDL2;
                     default:
-                        return GearModulationsJotron.AM;
+                        return JotronModulationsValues.AM;
                 }
             }
 
             catch (Exception ex)
             {
                 LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: Invalid" + ex + ". " + ToString(targetIp));
-                return GearModulationsJotron.AM;
+                return JotronModulationsValues.AM;
             }
         }
         ////JOI FIN
@@ -1313,6 +1415,7 @@ namespace u5ki.RemoteControlService
             return GearOperationStatus.OK;
             // JOI: 20170831 FIN
         }
+        
         /// <summary>
         /// 
         /// </summary>
@@ -1398,6 +1501,7 @@ namespace u5ki.RemoteControlService
                     + " {SNMPCallTimeout: " + SNMPCallTimeout + "}"
                     + " {SessionTimeout: " + SessionTimeout + "}";
         }
+
         /// <summary>
         /// 
         /// </summary>
@@ -1550,6 +1654,7 @@ namespace u5ki.RemoteControlService
             return GearOperationStatus.OK;
             // JOI: 20170831 FIN
         }
+
         // JOI: 20171031 ERROR #3231 
         /// <summary>
         /// Obtiene la potencia de transmisión del equipo.
@@ -1601,6 +1706,7 @@ namespace u5ki.RemoteControlService
             return power;
 
         }
+
         // JOI: 20171031 ERROR #3231 
         // JOI: 20171031 ERROR #3231  
         /// <summary>
@@ -1630,8 +1736,29 @@ namespace u5ki.RemoteControlService
             }
             return dBm;
         }
+
         // JOI: 20171031 ERROR #3231 
         #endregion
+
+        #region IRemoteControl
+
+        void IRemoteControl.CheckNode(dynamic rid, Action<dynamic, dynamic> response)
+        {
+            throw new NotImplementedException();
+        }
+
+        void IRemoteControl.GetMainParams(dynamic rid, Action<dynamic, dynamic> response)
+        {
+            throw new NotImplementedException();
+        }
+
+        void IRemoteControl.SetMainParams(dynamic rid, dynamic par, Action<dynamic, dynamic> response)
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion IRemoteControl
+
 
     }
 }

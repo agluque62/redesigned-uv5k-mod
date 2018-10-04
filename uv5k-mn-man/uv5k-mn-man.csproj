@@ -73,7 +73,8 @@
     <Compile Include="Servicios\RemoteControl\IRemoteControl.cs" />
     <Compile Include="Servicios\MNManager.cs" />
     <Compile Include="Helpers\TestingRoutines.cs" />
-    <Compile Include="Servicios\RemoteControl\RCNDFSimulado.cs" />
+    <Compile Include="Servicios\RemoteControl\RCJotron7000.cs" />
+    <Compile Include="Servicios\RemoteControl\RCNucSimulado.cs" />
     <Compile Include="Servicios\RemoteControl\SnmpInterfaz.cs" />
   </ItemGroup>
   <ItemGroup>

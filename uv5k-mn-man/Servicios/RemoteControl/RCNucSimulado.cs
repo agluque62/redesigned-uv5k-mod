@@ -1,5 +1,4 @@
-﻿#define DEBUG_VERBOSE_NO
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,23 +6,11 @@ using System.Threading.Tasks;
 using System.Net;
 using System.Text.RegularExpressions;
 
-//using U5ki.Enums;
-//using U5ki.Infrastructure;
-//using U5ki.Infrastructure.Code;
-//using U5ki.Infrastructure.Resources;
-using Utilities;
-
-using Lextm.SharpSnmpLib;
-//using Lextm.SharpSnmpLib.Messaging;
-//using Lextm.SharpSnmpLib.Objects;
-//using Lextm.SharpSnmpLib.Pipeline;
-using NLog;
-
 using uv5k_mn_mod.Modelo;
 
 namespace uv5k_mn_mod.Servicios.RemoteControl
 {
-    class RCNDFSimulado : IRemoteControl
+    class RCNucSimulado : IRemoteControl
     {
         /** */
         class SimulSnmpSession : GenericSnmpSession
@@ -203,7 +190,6 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
         }
 
         #endregion Internal
-
 
         #region IRemoteControl
 
