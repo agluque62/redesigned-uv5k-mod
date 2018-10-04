@@ -26,17 +26,17 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
     class RCNDFSimulado : IRemoteControl
     {
         /** */
-        class SimulMib : RdEquipmentMib
+        class SimulSnmpSession : GenericSnmpSession
         {
             const Int32 DelaySetFrequencyMs = 1000;
 
             const string ControlWriteOid = ".1.3.6.1.4.1.7916.8.4.1.1.0";
             const string ControlReadOid = ".1.3.6.1.4.1.7916.8.4.1.2.0";
 
-            const string CarrierOffStatusOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.9";    //	"ffCarrOffst
-            const string ChannelSpacingOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.7";      //	"ffChSpc
             const string DeviceStatusOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.11";       //	"grDevStat
             const string FrequencyOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.6";           //	"ffFreq
+            const string CarrierOffStatusOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.9";    //	"ffCarrOffst
+            const string ChannelSpacingOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.7";      //	"ffChSpc
             const string ModulationOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.8";          //  ffMode
             const string TxPowerOid = ".1.3.6.1.4.1.7916.8.4.1.3.1.10";            //	"rcTxPwr
 
@@ -47,11 +47,13 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             {
                 get
                 {
-                    snmpi.GetInt(TargetEndp, DeviceStatusOid + OidBase, (res, val, x) =>
+                    snmpi.Get<int>(TargetEndp, DeviceStatusOid + OidBase, (res, val, x) =>
                     {
-                        if (res == SnmpInterfazResult.Ok)
+                        SessionErrorsTreatment("Status Get", res, x);
+                        if (SessionErrors.Count==0)
                         {
-                            switch (val)
+                            int ival = (int)val;
+                            switch (ival)
                             {
                                 case 0:
                                     _status = RdEquipmentStatus.FailLocal;
@@ -70,7 +72,6 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                                     break;
                             }
                         }
-                        LastResult = res;
                     });
                     return _status;
                 }
@@ -80,30 +81,69 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             {
                 get
                 {
-                    string freq = string.Empty;
-                    snmpi.GetString(TargetEndp, FrequencyOid + OidBase, (res, val, x) =>
-                    {
-                        freq = res == SnmpInterfazResult.Ok ? val : "Error";
-                        LastResult = ExceptionTreatment("Frequency get", res, x);                        
-                    });
-                    return freq;
+                    return GetValue<string>("Frequency get", FrequencyOid + OidBase) as string;
                 }
                 set
                 {
-                    snmpi.SetString(TargetEndp, FrequencyOid + OidBase, value, (res, x) =>
-                    {
-                        LastResult = ExceptionTreatment("Frequency get", res, x);
-                    });
+                    SetValue<string>("Frequency set", FrequencyOid + OidBase, value);
+                }
+            }
+
+            public override int? CarrierOffset
+            {
+                get
+                {
+                    return GetValue<int?>("CarrierOffset get", CarrierOffStatusOid + OidBase) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("CarrierOffset set", CarrierOffStatusOid + OidBase, value);
+                }
+            }
+
+            public override int? ChannelSpacing
+            {
+                get
+                {
+                    return GetValue<int?>("ChannelSpacingOid get", ChannelSpacingOid + OidBase) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("ChannelSpacingOid set", ChannelSpacingOid + OidBase, value);
+                }
+            }
+
+            public override int? Modulation
+            {
+                get
+                {
+                    return GetValue<int?>("ModulationOid get", ModulationOid + OidBase) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("ModulationOid set", ModulationOid + OidBase, value);
+                }
+            }
+
+            public override int? Power
+            {
+                get
+                {
+                    return GetValue<int?>("TxPowerOid get", TxPowerOid + OidBase) as int?;
+                }
+                set
+                {
+                    SetValue<int?>("TxPowerOid set", TxPowerOid + OidBase, value);
                 }
             }
 
             #endregion
 
-            public SimulMib(IPEndPoint endp, string rid)
+            public SimulSnmpSession(IPEndPoint endp, string rid) : base()
             {
                 TargetEndp = endp;
                 Rid = rid;
-                LastResult = RdEquipmentStatus.NotPresent;
+                SessionErrors = new List<dynamic>();
             }
 
             private string OidBase
@@ -115,17 +155,17 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                         string oid = string.Empty;
                         if (EquipmentsOid.Keys.Contains(Rid)==false || EquipmentsOid[Rid]==string.Empty)
                         {
-                            snmpi.SetString(TargetEndp, ControlWriteOid, Rid, (res, x) =>
+                            snmpi.Set<string>(TargetEndp, ControlWriteOid, Rid, (res, x) =>
                             {
-                                LastResult = res ? RdEquipmentStatus.Ready : ExceptionTreatment("Frequency get", x);
+                                SessionErrorsTreatment("OidBase ControlWritie", res, x);
                             });
-                            if (LastResult == RdEquipmentStatus.Ready)
+                            if (SessionErrors.Count == 0)
                             {
                                 System.Threading.Thread.Sleep(200);
-                                snmpi.GetString(TargetEndp, ControlReadOid, (res, val, x) =>
+                                snmpi.Get<string>(TargetEndp, ControlReadOid, (res, val, x) =>
                                 {
-                                    LastResult = res ? RdEquipmentStatus.Ready : ExceptionTreatment("Frequency get", x);
-                                    EquipmentsOid[Rid] = LastResult == RdEquipmentStatus.Ready ? val : string.Empty;
+                                    SessionErrorsTreatment("OidBase ControlRead", res, x);
+                                    EquipmentsOid[Rid] = SessionErrors.Count == 0 ? val as string : string.Empty;
                                 });
                             }
                         }
@@ -142,122 +182,22 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             }
         }
 
-        #region IRemoteControl_old
-        /// <summary>
-        /// 
-        /// </summary>
-		
-        // JOI. CONTROL_SET_SIP
-        private int delaySetFrequencyMs = Convert.ToInt32(/*u5ki.RemoteControlService.Properties.Settings.Default.*/DelaySetFrequencyMs);
-        // JOI. CONTROL_SET_SIP FIN.
-		
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="action"></param>
-        /// <param name="response"></param>
-        /// <param name="node"></param>
-        /// <param name="isEmitter"></param>
-        public void ConfigureNode(RCConfigurationAction action, Action<GearOperationStatus> response, BaseNode node, Boolean isEmitter, Boolean isMaster)
-        {
-            if (action == RCConfigurationAction.Unassing)
-            {
-                Invoke(response, "ConfigureNode.Unassing", GearOperationStatus.OK, false); 
-                return;
-            }
-            LogInfo<RCNDFSimulado>(String.Format("RCNDFSimulado.ConfigureNode.Assign({0})", Id));
-            //Task.Factory.StartNew(() =>
-            //{
-            //    System.Threading.Thread.CurrentThread.Name = "CfgNode_" + (Id.Contains("_N") == true ? Id.ToLower() : Id);
-                try
-                {
-					// JOI. CONTROL_SET_SIP
-					System.Threading.Thread.Sleep(delaySetFrequencyMs);
-#if LOCKER
-                    lock (locker)
-#endif
-                    {
-                        ip_equipo = node.IP;
-                        if (String.IsNullOrEmpty(OidEquipo))
-                        {
-                            Invoke(response, "ConfigureNode.Assing", GearOperationStatus.Fail, false);
-                            _lastExceptions["ConfigureNode"] = null;
-                            return;
-                        }
-                        // Fecuency
-                        SnmpClient.SetString(ip_equipo, Community,
-                            u5ki.RemoteControlService.OIDs.NDFSimulado.Frecuency + OidEquipo,
-                            node.Frecuency, SNMPCallTimeout, Port, SNMPVersion);
-
-                        // Channel Spacing.
-                        SnmpClient.SetInt(ip_equipo, Community,
-                            u5ki.RemoteControlService.OIDs.NDFSimulado.ChannelSpacing + OidEquipo,
-                            (int)node.Channeling, SNMPCallTimeout, Port, SNMPVersion);
-
-                        // Modulation
-                        SnmpClient.SetInt(ip_equipo, Community,
-                            u5ki.RemoteControlService.OIDs.NDFSimulado.Modulation + OidEquipo,
-                            (int)node.Modulation, SNMPCallTimeout, Port, SNMPVersion);
-
-                        if (isEmitter)
-                        {
-                            // Carrier Offset
-                            SnmpClient.SetInt(ip_equipo, Community,
-                                u5ki.RemoteControlService.OIDs.NDFSimulado.CarrierOffStatus + OidEquipo,
-                                (int)node.Offset, SNMPCallTimeout, Port, SNMPVersion);
-
-                            // Power
-                            SnmpClient.SetInt(ip_equipo, Community,
-                                u5ki.RemoteControlService.OIDs.NDFSimulado.TxPower + OidEquipo,
-                                (int)node.PowerLevel, SNMPCallTimeout, Port, SNMPVersion);
-                        }
-
-                        Invoke(response, "ConfigureNode.Assing", GearOperationStatus.OK, false);
-                        _lastExceptions["ConfigureNode"] = null;
-                    }
-                }
-                catch (Lextm.SharpSnmpLib.Messaging.TimeoutException x)
-                {
-                    ExceptionTreatment("ConfigureNode", x);
-                    Invoke(response, "ConfigureNode.Assing", GearOperationStatus.Timeout, false);
-                }
-                catch (Exception x)
-                {
-                    ExceptionTreatment("ConfigureNode", x);
-                    Invoke(response, "ConfigureNode.Assing", GearOperationStatus.Fail, false);
-                }
-            //});
-        }
-
-        #endregion IRemoteControl_old
-
-        #region protected
-
-
-
-        #endregion protected
-
-        #region static
-        #endregion static
-
         #region Internal
 
-
-
-        RdEquipmentStatus SNMPMasterControlConfig(SimulMib simulMib, string sFrecuencia)
+        RdEquipmentStatus SNMPMasterControlConfig(SimulSnmpSession snmpSession, string sFrecuencia)
         {
             RdEquipmentStatus result = RdEquipmentStatus.NotPresent;
 
             string ExpectedFrequency = sFrecuencia.Replace(".", "").Replace(",", "");
-            string freq = simulMib.Frequency;
-            if (simulMib.LastResult == SnmpInterfazResult.Ok)
+            string freq = snmpSession.Frequency;
+            if (snmpSession.SessionErrors.Count == 0)
             {
                 string ReadFrequency = freq.Replace(".", "").Replace(",", "");
                 result = ReadFrequency == ExpectedFrequency ? RdEquipmentStatus.Ready : RdEquipmentStatus.FailMasterConfig;
             }
             else
             {
-                result = simulMib.LastResult== SnmpInterfazResult.Timeout ? RdEquipmentStatus.NotPresent : RdEquipmentStatus.Fail;
+                result = snmpSession.LastStatus;
             }
             return result;
         }
@@ -274,53 +214,48 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             else
             {
                 RdEquipmentDataItem item = (rid as RdEquipmentDataItem);
-                SimulMib simulEq = new SimulMib(item.RemoteControlEndp, item.Rid);
+                SimulSnmpSession snmpSession = new SimulSnmpSession(item.RemoteControlEndp, item.Rid);
                 if (item.MainOrStandby == true)
                 {
-                    RdEquipmentStatus res = SNMPMasterControlConfig(simulEq, item.MainFrequency);
+                    RdEquipmentStatus res = SNMPMasterControlConfig(snmpSession, item.MainFrequency);
                     if (res == RdEquipmentStatus.FailMasterConfig)
                     {
                         response?.Invoke(true, RdEquipmentStatus.FailMasterConfig);
                         return;
                     }
                 }
-                response?.Invoke(true, simulEq.Status);
+                response?.Invoke(true, snmpSession.Status);
             }
         }
 
         public void GetMainParams(dynamic rid, Action<dynamic, dynamic> response)
         {
-            if (!(rid is RdEquipmentDataItem))
-                response?.Invoke(false, new InvalidCastException(rid));
-            else
-            {
-                RdEquipmentDataItem item = (rid as RdEquipmentDataItem);
-                try
-                {
-
-                }
-                catch (Exception x)
-                {
-                    response?.Invoke(false, x);
-                }
-            }
+            throw new NotImplementedException();
         }
 
         public void SetMainParams(dynamic rid, dynamic par, Action<dynamic, dynamic> response)
         {
             if (!(rid is RdEquipmentDataItem))
                 response?.Invoke(false, new InvalidCastException(rid));
+            else if (!(par is RdEquipmentDataItem))
+                response?.Invoke(false, new InvalidCastException(par));
             else
             {
-                RdEquipmentDataItem item = (rid as RdEquipmentDataItem);
-                try
-                {
+                RdEquipmentDataItem itemTo = (rid as RdEquipmentDataItem);
+                RdEquipmentDataItem itemFrom = (rid as RdEquipmentDataItem);
+                SimulSnmpSession snmpSession = new SimulSnmpSession(itemTo.RemoteControlEndp, itemTo.Rid);
 
-                }
-                catch (Exception x)
+                snmpSession.Frequency = itemFrom.MainFrequency;
+                snmpSession.Modulation = itemFrom.MainModulationMode;
+                snmpSession.ChannelSpacing = itemFrom.MainChannelSpace;
+                if (itemTo.TxRx)
                 {
-                    response?.Invoke(false, x);
+                    snmpSession.CarrierOffset = itemFrom.MainCarrierOffset;
+                    snmpSession.Power = itemFrom.MainPower;
                 }
+
+
+                response?.Invoke(snmpSession.Executed, snmpSession.LastStatus);
             }
         }
 

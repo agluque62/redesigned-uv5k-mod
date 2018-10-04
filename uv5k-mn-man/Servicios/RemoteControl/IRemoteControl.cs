@@ -25,19 +25,60 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
         void SetMainParams(dynamic rid, dynamic par, Action<dynamic, dynamic> response);
     }
 
-    public abstract class RdEquipmentMib
+    public abstract class GenericSnmpSession
     {
         public virtual RdEquipmentStatus Status { get; }
         public virtual string Frequency { get; set; }
-
-
-        protected SnmpInterfaz snmpi = new SnmpInterfaz();
+        public virtual int? ChannelSpacing { get; set; }
+        public virtual int? Modulation { get; set; }
+        public virtual int? CarrierOffset { get; set; }
+        public virtual int? Power { get; set; }
 
         public IPEndPoint TargetEndp { get; set; }
-        public SnmpInterfazResult LastResult { get; set; }
+        public List<dynamic> SessionErrors { get; set; }
         public string Rid { get; set; }
+        public bool Executed
+        {
+            get { return SessionErrors.Count == 0; }
+        }
+        public RdEquipmentStatus LastStatus
+        {
+            get
+            {
+                return Executed ? RdEquipmentStatus.Ready :
+                    SessionErrors.Where(i => i.res == SnmpInterfazResult.Timeout).ToList().Count == 0 ? RdEquipmentStatus.Fail :
+                    RdEquipmentStatus.NotPresent;
+            }
+        }
 
-        static IDictionary<String, Type> _lastExceptions = new Dictionary<String, Type>();
+        protected SnmpInterfaz snmpi = new SnmpInterfaz();
+        protected object GetValue<T>(string strproc, string oid)
+        {
+            object retorno = null;
+            snmpi.Get<T>(TargetEndp, oid, (res, val, x) =>
+            {
+                retorno = val;
+                SessionErrorsTreatment(strproc, res, x);
+            });
+            return retorno;
+        }
+        protected void SetValue<T>(string strproc, string oid, T valor)
+        {
+            snmpi.Set<T>(TargetEndp, oid, valor, (res, x) =>
+            {
+                SessionErrorsTreatment(strproc, res, x);
+            });
+        }
+        protected void SessionErrorsTreatment(String strProc, SnmpInterfazResult res, Exception ex)
+        {
+            if (res != SnmpInterfazResult.Ok)
+            {
+                if (ex != null)
+                    ExceptionTreatment(strProc, res, ex);
+                SessionErrors.Add(new { strProc, res, ex });
+            }
+        }
+        protected static IDictionary<String, Type> _lastExceptions = new Dictionary<String, Type>();
         protected static SnmpInterfazResult ExceptionTreatment(String strProc, SnmpInterfazResult res, Exception ex)
         {
             if (res != SnmpInterfazResult.Ok && ex != null)

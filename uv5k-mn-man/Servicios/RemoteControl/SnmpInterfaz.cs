@@ -106,7 +106,7 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 new SnmpInterfazTimeoutException($"SnmpClient.Set[{endp}]: No responde..."));
         }
 
-        public void GetInt(IPEndPoint endp, string oid, Action<SnmpInterfazResult, int, Exception> handler)
+        public void Get<T>(IPEndPoint endp, string oid, Action<SnmpInterfazResult, Object, Exception> handler)
         {
             try
             {
@@ -116,56 +116,27 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 };
                 Get(endp, lst, (res, ep, val, x) =>
                 {
-                    if (res==SnmpInterfazResult.Ok)
+                    if (res == SnmpInterfazResult.Ok && val.Count == 1)
                     {
-                        int _ret = 0;
-                        if (int.TryParse(val[0].Data.ToString(), out _ret) == false)
-                            throw new SnmpInterfazInternalErrorException($"CienteSnmp.GetInt: TryParse(result[0].Data.ToString(): {ip}---{oid}");
-                        handler(res, _ret, null);
+                        if (typeof(T) == typeof(string) && (val[0].Data is OctetString))
+                        {
+                            handler(res, val[0].Data.ToString(), x);
+                        }
+                        else if (typeof(T) == typeof(int?) && (val[0].Data is Integer32))
+                        {
+                            handler(res, (val[0].Data as Integer32).ToInt32(), x);
+                        }
+                        else
+                        {
+                            // TODO. Error tipo no valido
+                            handler(SnmpInterfazResult.Error, null, new System.IO.InvalidDataException("SNMP. El tipo solicitado no coincide con el devuelto"));
+                        }
                     }
                     else
                     {
-                        handler(res, 0, x);
+                        // TODO. Error Devuelto por SNMP
+                        handler(res, null, x);
                     }
-                });
-            }
-            catch (Exception x)
-            {
-                handler(SnmpInterfazResult.Error, 0, x);
-            }
-        }
-
-        public void SetInt(IPEndPoint endp, string oid, int valor, Action<SnmpInterfazResult, Exception> handler)
-        {
-            try
-            {
-                var lst = new List<Variable>()
-                {
-                    new Variable(new ObjectIdentifier(oid), new Integer32(valor))
-                };
-                Set(endp, lst, (res, ep, val, x) =>
-                {
-                    handler(res, x);
-                });
-            }
-            catch (Exception x)
-            {
-                handler(SnmpInterfazResult.Error, x);
-            }
-        }
-
-        public void GetString(IPEndPoint endp, string oid, Action<SnmpInterfazResult, string, Exception> handler)
-        {
-            try
-            {
-                var lst = new List<Variable>()
-                {
-                    new Variable(new ObjectIdentifier(oid))
-                };
-
-                Get(endp, lst, (res, ep, val, x) =>
-                {
-                    handler(res, res == SnmpInterfazResult.Ok ? val[0].Data.ToString() : string.Empty, x);
                 });
             }
             catch (Exception x)
@@ -174,23 +145,39 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             }
         }
 
-        public void SetString(IPEndPoint endp, string oid, String valor, Action<SnmpInterfazResult, Exception> handler)
+        public void Set<T>(IPEndPoint endp, string oid, T valor, Action<SnmpInterfazResult, Exception> handler)
         {
             try
             {
-                var lst = new List<Variable>()
+                ISnmpData snmpval = null;
+
+                if (typeof(T) == typeof(string))
+                    snmpval = new OctetString(Convert.ToString(valor));
+                else if (typeof(T) == typeof(int?))
+                    snmpval = new Integer32(Convert.ToInt32(valor));
+
+                if (snmpval != null)
                 {
-                    new Variable(new ObjectIdentifier(oid), new OctetString(valor))
-                };
-                Set(endp, lst, (res, ep, val, x) =>
+                    var lst = new List<Variable>()
+                    {
+                        new Variable(new ObjectIdentifier(oid), snmpval)
+                    };
+                    Set(endp, lst, (res, ep, val, x) =>
+                    {
+                        handler(res, x);
+                    });
+                }
+                else
                 {
-                    handler(res, x);
-                });
+                    // TODO. Error tipo no valido
+                    handler(SnmpInterfazResult.Error, new ArgumentException("SNMP. El tipo solicitado no esta implementado."));
+                }
             }
             catch (Exception x)
             {
                 handler(SnmpInterfazResult.Error, x);
             }
+
         }
 
         //public void TrapTo(string ipTo, int port, string community, string oid, string val)
