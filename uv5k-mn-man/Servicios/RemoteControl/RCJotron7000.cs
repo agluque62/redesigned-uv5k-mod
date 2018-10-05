@@ -10,6 +10,9 @@ using System.Threading.Tasks;
 using System.Timers;
 
 
+using U5ki.Infrastructure;
+
+using uv5k_mn_mod.Helpers;
 using uv5k_mn_mod.Modelo;
 
 
@@ -151,6 +154,43 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             const string OID_JOTRON_ALARMAS_PERMANENTES_RX = "1.3.6.1.4.1.22154.3.1.2.5.2.6.0";     // OctectString
             const string OID_JOTRON_TXAMPOWERFINE = "1.3.6.1.4.1.22154.3.1.2.2.1.4.4.0";            // OctectString,  The carrier output power in dBm x 10 (0.1 dB resolution) min  300 max 470.
 
+            static readonly SnmpDataSet CommonDataSetForRead = new SnmpDataSet()
+            {
+                { DeviceStatusOid, null},
+                { OperationalModeOid, null },
+                { OperationalStatusATCOid, null},
+                { InServiceModeOid, null},
+                { OID_EUROCONTROL_VOSIPSESSIONLIST, null },
+                { FrequencyOid, null },
+                { ChannelSpacingOid, null },
+                { ModulationOid, null }
+            };
+            static readonly SnmpDataSet TxOnlyDataSetForRead = new  SnmpDataSet()
+            {
+                { CarrierOffStatusOid, null },
+                { TxAnaModSourceOid, null },
+                { TxPowerModeOid, null },
+                { OID_JOTRON_ALARMAS_PERMANENTES_TX, null},
+                { OID_JOTRON_TXAMPOWERFINE, null }
+            };
+            static readonly SnmpDataSet RxOnlyDataSetForRead = new SnmpDataSet()
+            {
+                { OID_JOTRON_ALARMAS_PERMANENTES_RX, null},
+            };
+
+            static readonly SnmpDataSet CommonDataSetForWrite = new SnmpDataSet()
+            {
+                { FrequencyOid, null },
+                { ChannelSpacingOid, null },
+                { ModulationOid, null }
+            };
+
+            static readonly SnmpDataSet TxOnlyDataSetForWrite = new SnmpDataSet()
+            {
+                { CarrierOffStatusOid, null },
+                { OID_JOTRON_TXAMPOWERFINE, null }
+            };
+
             #region Override
 
             private RdEquipmentStatus _status = RdEquipmentStatus.NotPresent;
@@ -256,6 +296,70 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 Rid = rid;
                 SessionErrors = new List<dynamic>();
             }
+
+            public dynamic GetRawEquipmentData(bool isTx)
+            {
+                var dic = (isTx ? CommonDataSetForRead.Union(TxOnlyDataSetForRead) : CommonDataSetForRead.Union(RxOnlyDataSetForRead)) as SnmpDataSet;
+
+                dic = GetSet("GetRawEquipmentData", dic);
+
+                if (isTx) return new
+                {
+                    DeviceStatus = dic[DeviceStatusOid],
+                    OperationalMode = dic[OperationalModeOid],
+                    OperationalStatusATC = dic[OperationalStatusATCOid],
+                    InServiceMode = dic[InServiceModeOid],
+                    SipSessionList = dic[OID_EUROCONTROL_VOSIPSESSIONLIST],
+                    Frequency = dic[FrequencyOid],
+                    ChannelSpacing = dic[ChannelSpacingOid],
+                    Modulation = dic[ModulationOid],
+                    PermanentAlarm = dic[OID_JOTRON_ALARMAS_PERMANENTES_TX],
+                    CarrierOffStatus = dic[CarrierOffStatusOid],
+                    TxAnaModSource = dic[TxAnaModSourceOid],
+                    TxPowerModeOid = dic[TxPowerModeOid],
+                    TxPowerVal = dic[OID_JOTRON_TXAMPOWERFINE]
+                };
+                else return new
+                {
+                    DeviceStatus = dic[DeviceStatusOid],
+                    OperationalMode = dic[OperationalModeOid],
+                    OperationalStatusATC = dic[OperationalStatusATCOid],
+                    InServiceMode = dic[InServiceModeOid],
+                    SipSessionList = dic[OID_EUROCONTROL_VOSIPSESSIONLIST],
+                    Frequency = dic[FrequencyOid],
+                    ChannelSpacing = dic[ChannelSpacingOid],
+                    Modulation = dic[ModulationOid],
+                    PermanentAlarm = dic[OID_JOTRON_ALARMAS_PERMANENTES_RX]
+                };
+            }
+
+            public void SetRawEquipmentData(bool isTx, dynamic data)
+            {
+                if (isTx)
+                {
+                    var dic = (SnmpDataSet)CommonDataSetForWrite.Union(TxOnlyDataSetForWrite);
+
+                    dic[FrequencyOid] = GeneralHelper.PropertyExists(data, "Frequency") ? data.Frequency : null;
+                    dic[ChannelSpacingOid] = GeneralHelper.PropertyExists(data, "ChannelSpacing") ? data.ChannelSpacing : null;
+                    dic[ModulationOid] = GeneralHelper.PropertyExists(data, "Modulation") ? data.Modulation : null;
+                    dic[CarrierOffStatusOid] = GeneralHelper.PropertyExists(data, "CarrierOffStatus") ? data.CarrierOffStatus : null;
+                    dic[OID_JOTRON_TXAMPOWERFINE] = GeneralHelper.PropertyExists(data, "TxPowerVal") ? data.TxPowerVal : null;
+
+                    SetSet("SetRawEquipmentData", dic);
+                }
+                else
+                {
+                    var dic = (SnmpDataSet)CommonDataSetForWrite.Union(CommonDataSetForWrite);
+
+                    dic[FrequencyOid] = GeneralHelper.PropertyExists(data, "Frequency") ? data.Frequency : null;
+                    dic[ChannelSpacingOid] = GeneralHelper.PropertyExists(data, "ChannelSpacing") ? data.ChannelSpacing : null;
+                    dic[ModulationOid] = GeneralHelper.PropertyExists(data, "Modulation") ? data.Modulation : null;
+
+                    SetSet("SetRawEquipmentData", dic);
+                }
+
+            }
+
         }
 
         #endregion Sesion SNMP
@@ -270,9 +374,6 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
         public readonly Int32 SNMPCallTimeout = 500; // Miliseconds = 1,0 seconds antes 0,5
         public readonly Int32 NUMMAXTimeout = 1;
         // JOI: 20171031 ERROR #3231 
-        public readonly Int32 PowerLevelMin = 300;
-        public readonly Int32 PowerLevelMax = 470;
-        public readonly Int32 PowerLevelDefault = 470;
         // JOI: 20171031 ERROR #3231
 
         // private static Logger _logger = LogManager.GetCurrentClassLogger();
@@ -615,7 +716,6 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 }
             }
         }
-
         // JOI: 20171031 ERROR #3231
         /// <summary>
         /// Obtención del valor de potencia del equipo Master
@@ -911,612 +1011,6 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             // JOI: 20170831 FIN
         }
 
-        private bool HayAlarmaPermanenteTx( Byte[] deviceStatus )
-        {
-            Byte[] sStatus = { 0 };
-
-            // Analizamos primer bloque
-            // txAlarm(7)---->Viene activo en este punto, txPaModuleAlarm(6), txModModuleAlarm(5), txFrontModuleAlarm(4),
-            // txMainModuleAlarm(3),txExternalAlarm(2),txForcedAlarm(1)---->No se gestiona,txExtUnitAlarm(0)
-            Buffer.BlockCopy(deviceStatus, 2, sStatus, 0, 1);
-            BitArray bits = new BitArray(sStatus);
-            if (bits[6] == true || bits[5] == true ||bits[4] == true ||bits[3] == true ||
-                bits[2] == true ||bits[0] == true)
-                return true;
-
-            // Analizamos segundo bloque
-            // txPASWRAlarm(7),txPACurrentAlarm(6),txPATemperatureAlarm(5),txPA28V0Alarm(4),
-            // txPA12V0Alarm(3),txPA5V0Alarm(2),txPA3V3Alarm(1),txPA5V0Neg(0)
-            Buffer.BlockCopy(deviceStatus, 3, sStatus, 0, 1);
-            BitArray bits1 = new BitArray(sStatus);
-            if (bits1[7] == true || bits1[6] == true || bits1[5] == true || bits1[4] == true ||
-                bits1[3] == true || bits1[2] == true || bits1[1] == true || bits1[0] == true)
-                return true;
-
-            // Analizamos tercer bloque
-            // txPAFanFailure(7),txPAPwrOutAlarm(6),txRFTuneAlarm(5),txModLoLvlAlarm(4),
-            // txModLoLockAlarm(3),txMod6V0Alarm(2),txPowerACAlarm(1),txMainInStby(0),
-            Buffer.BlockCopy(deviceStatus, 4, sStatus, 0, 1);
-            BitArray bits2 = new BitArray(sStatus);
-            if (bits2[7] == true || bits2[6] == true || bits2[5] == true || bits2[4] == true ||
-                bits2[3] == true || bits2[2] == true || bits2[1] == true || bits2[0] == true)
-                return true;
-
-            // Analizamos cuarto bloque
-            // txMainEthernetAlarm(7),txMainCodecAlarm(6),txMainSPIAlarm(5),txMainFrontAlarm(4)
-            // txMainRemExpAlarm(3),txMainBiteADCAlarm(2),txMainMemAlarm(1),txSpareAlarm31(0)
-            Buffer.BlockCopy(deviceStatus, 5, sStatus, 0, 1);
-            BitArray bits3 = new BitArray(sStatus);
-            if (bits3[7] == true || bits3[6] == true || bits3[5] == true || bits3[4] == true ||
-                bits3[3] == true || bits3[2] == true || bits3[1] == true || bits3[0] == true)
-                return true;
-
-            return false;
-        }
-
-
-        private bool HayAlarmaPermanenteRx(Byte[] deviceStatus)
-        {
-            Byte[] sStatus = { 0 };
-
-            // Analizamos primer bloque
-            // rxAlarm(7)---->Viene activo en este punto, rxRfModuleAlarm(6), rxPowerModuleAlarm(5), rxFrontModuleAlarm(4),
-            // rxMainModuleAlarm(3),rxExternalAlarm(2),rxForcedAlarm(1)---->No se gestiona,rxExtUnitAlarm(0)
-            Buffer.BlockCopy(deviceStatus, 2, sStatus, 0, 1);
-            BitArray bits = new BitArray(sStatus);
-            if (bits[6] == true || bits[5] == true || bits[4] == true || bits[3] == true ||
-                bits[2] == true || bits[0] == true)
-                return true;
-
-            // Analizamos segundo bloque
-            // rxRFLoLvlAlarm(7),rxRFLoLockAlarm(6),rxRF6V0Alarm(5),rxRFLNACurrentAlarm(4),
-            // rxRFIFCurrentAlarm(3),rxRF30V0Alarm(2),rxSpareAlarm14(1),rxPowerACAlarm(0)
-            Buffer.BlockCopy(deviceStatus, 3, sStatus, 0, 1);
-            BitArray bits1 = new BitArray(sStatus);
-            if (bits1[7] == true || bits1[6] == true || bits1[5] == true || bits1[4] == true ||
-                bits1[3] == true || bits1[2] == true || bits1[1] == true || bits1[0] == true)
-                return true;
-
-            // Analizamos tercer bloque
-            // rxPower12V0Alarm(7),rxPower5V0Alarm(6),rxPower3V3Alarm(5),rxPowerTempAlarm(4),
-            // rxPowerCurrentAlarm(3),rxPowerDCInputAlarm(2),rxCodecLDAlarm(1),rxMainAGCAlarm(0)
-            Buffer.BlockCopy(deviceStatus, 4, sStatus, 0, 1);
-            BitArray bits2 = new BitArray(sStatus);
-            if (bits2[7] == true || bits2[6] == true || bits2[5] == true || bits2[4] == true ||
-                bits2[3] == true || bits2[2] == true || bits2[1] == true || bits2[0] == true)
-                return true;
-
-            // Analizamos cuarto bloque
-            // rxMainEthernetAlarm(7),rxMainCodecAlarm(6),rxMainSPIAlarm(5)rxMainFrontAlarm(4),
-            // rxMainRemExpAlarm(3),rxMainBiteADCAlarm(2),rxMainMemAlarm(1),rxMainIFAlarm(0)
-            Buffer.BlockCopy(deviceStatus, 5, sStatus, 0, 1);
-            BitArray bits3 = new BitArray(sStatus);
-            if (bits3[7] == true || bits3[6] == true || bits3[5] == true || bits3[4] == true ||
-                bits3[3] == true || bits3[2] == true || bits3[1] == true || bits3[0] == true)
-                return true;
-
-            return false;
-        }
-
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="targetIp"></param>
-        /// <param name="frecuency"></param>
-        /// <param name="openSession"></param>
-        /// <returns></returns>
-        private GearOperationStatus SNMPFrecuencySet(String targetIp, String frecuency, bool isEmitter, Boolean openSession = true)
-        {
-            String logMethod = "FRECUENCY SET";
-#if DEBUG
-            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
-                return GearOperationStatus.OK;
-#endif
-            if (openSession)
-            {
-                GearOperationStatus status = SNMPDeviceStatusGet(targetIp,isEmitter, RCSessionTypes.Remote);
-                if (status != GearOperationStatus.OK)
-                    return status;
-            }
-            
-            frecuency = frecuency.Replace(".", "");
-            frecuency = frecuency.Replace(",", "");
-            int frecuencia = Convert.ToInt32(frecuency);
-            // JOI: 20170831
-            int i_rtimeout = 0;
-            while (i_rtimeout <= NUMMAXTimeout)
-            {
-                try
-                {
-                    SnmpClient.SetInt(
-                        targetIp,
-                        Community,
-                        u5ki.RemoteControlService.OIDs.RCJotron7000.Frecuency,
-                        frecuencia,
-                        SNMPCallTimeout,
-                        Port,
-                        SNMPVersion);
-
-                    return GearOperationStatus.OK;
-                }
-                catch (Exception ex)
-                {
-                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
-                    {
-                        if (i_rtimeout >= NUMMAXTimeout)
-                        {
-                            return ExceptionTreatment(ex, logMethod, targetIp, frecuency,
-                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                        }
-                        i_rtimeout++;
-                    }
-                    else
-                    {
-                        return ExceptionTreatment(ex, logMethod, targetIp, frecuency,
-                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                    }
-                }
-            }
-            return GearOperationStatus.OK;
-            // JOI: 20170831 FIN
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="targetIp"></param>
-        /// <returns></returns>
-        private String SNMPFrecuencyGet(String targetIp, bool isEmitter)
-        {
-            String logMethod = "FRECUENCY GET";
-#if DEBUG
-            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
-                return "ERROR: ByPass Active.";
-#endif
-            GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
-            if (status != GearOperationStatus.OK)
-                return "ERROR: Not able to read.";
-            // JOI: 20170831
-            int i_rtimeout = 0;
-            while (i_rtimeout <= NUMMAXTimeout)
-            {
-                try
-                {
-                    Int32 frecuency = SnmpClient.GetInt(
-                        targetIp,
-                        Community,
-                        u5ki.RemoteControlService.OIDs.RCJotron7000.Frecuency,
-                        SNMPCallTimeout,
-                        Port,
-                        SNMPVersion);
-
-                    return frecuency.ToString();
-                }
-                catch (Exception ex)
-                {
-                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
-                    {
-                        if (i_rtimeout >= NUMMAXTimeout)
-                        {
-                            ExceptionTreatment(ex, logMethod, targetIp);
-                            return null;
-                        }
-                        i_rtimeout++;
-                    }
-                    else
-                    {
-                        ExceptionTreatment(ex, logMethod, targetIp);
-                        return null;
-                    }
-                }
-
-            }
-            return "0000000";
-            // JOI: 20170831 FIN
-        }
-
-        ////JOI
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="modulation"></param>
-        /// <param name="targetIp"></param>
-        /// <returns></returns>
-        private JotronChannelSpacingsValues ConvertChannelSpacingSet(GearChannelSpacings channelSpacing, String targetIp)
-        {
-
-            String logMethod = "CNV CHANNEL SPACING SET";
-
-            try
-            {
-                switch (channelSpacing)
-                {
-                    case GearChannelSpacings.kHz_8_33:
-                        return JotronChannelSpacingsValues.jt_kHz_8_33;
-                    case GearChannelSpacings.kHz_25_00:
-                        return JotronChannelSpacingsValues.jt_kHz_25_00;
-                    default:
-                        return JotronChannelSpacingsValues.jt_kHz_25_00;
-                }
-            }
-
-            catch (Exception ex)
-            {
-                LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: Invalid" + ex + ". " + ToString(targetIp));
-                return JotronChannelSpacingsValues.jt_kHz_25_00;
-            }
-        }
-
-        ////JOI FIN
-        
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="targetIp"></param>
-        /// <param name="channelSpacing"></param>
-        /// <param name="openSession"></param>
-        /// <returns></returns>
-        private GearOperationStatus SNMPChannelSpacingSet(String targetIp, GearChannelSpacings channelSpacing, bool isEmitter, Boolean openSession = true)
-        {
-            String logMethod = "CHANNEL SPACING SET";
-#if DEBUG
-            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
-                return GearOperationStatus.OK;
-#endif
-            if (openSession)
-            {
-                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
-                if (status != GearOperationStatus.OK)
-                    return status;
-            }
-            // JOI: 20170831
-            int i_rtimeout = 0;
-            while (i_rtimeout <= NUMMAXTimeout)
-            {
-                try
-                {
-                    SnmpClient.SetInt(
-                        targetIp,
-                        Community,
-                        u5ki.RemoteControlService.OIDs.RCJotron7000.ChannelSpacing,
-                        Convert.ToInt32(ConvertChannelSpacingSet(channelSpacing, targetIp)),
-                        SNMPCallTimeout,
-                        Port,
-                        SNMPVersion);
-                    return GearOperationStatus.OK;
-                }
-                catch (Exception ex)
-                {
-                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
-                    {
-                        if (i_rtimeout >= NUMMAXTimeout)
-                        {
-                            return ExceptionTreatment(ex, logMethod, targetIp, channelSpacing.ToString(),
-                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                        }
-                        i_rtimeout++;
-                    }
-                    else
-                    {
-                        return ExceptionTreatment(ex, logMethod, targetIp, channelSpacing.ToString(),
-                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                    }
-                }
-            }
-            return GearOperationStatus.OK;
-            // JOI: 20170831 FIN
-        }
-
-        ////JOI
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="carrierOffstatus"></param>
-        /// <param name="targetIp"></param>
-        /// <returns></returns>
-        private JotronCarrierOffStatusValues ConvertCarrierOffsetJotron(GearCarrierOffStatus carrierOffstatus, String targetIp)
-        {
-
-
-            String logMethod = "CNV CARRIEROFF SET";
-
-            try
-            {
-                switch (carrierOffstatus)
-                {
-                    case GearCarrierOffStatus.Off:
-                        return JotronCarrierOffStatusValues.Off;
-                    case GearCarrierOffStatus.kHz_7_5:
-                        return JotronCarrierOffStatusValues.kHz_7_5;
-                    case GearCarrierOffStatus.kHz_5_0:
-                        return JotronCarrierOffStatusValues.kHz_5_0;
-                    case GearCarrierOffStatus.kHz_2_5:
-                        return JotronCarrierOffStatusValues.kHz_2_5;
-                    case GearCarrierOffStatus.Hz_0_0:
-                        return JotronCarrierOffStatusValues.Hz_0_0;
-                    case GearCarrierOffStatus.kHz_minus_2_5:
-                        return JotronCarrierOffStatusValues.kHz_minus_2_5;
-                    case GearCarrierOffStatus.kHz_minus_5_0:
-                        return JotronCarrierOffStatusValues.kHz_minus_5_0;
-                    case GearCarrierOffStatus.kHz_minus_7_5:
-                        return JotronCarrierOffStatusValues.kHz_minus_7_5;
-                    case GearCarrierOffStatus.kHz_8:
-                        return JotronCarrierOffStatusValues.kHz_8;
-                    case GearCarrierOffStatus.kHz_4:
-                        return JotronCarrierOffStatusValues.kHz_4;
-                    case GearCarrierOffStatus.kHz_minus_4:
-                        return JotronCarrierOffStatusValues.kHz_minus_4;
-                    case GearCarrierOffStatus.kHz_minus_8:
-                        return JotronCarrierOffStatusValues.kHz_minus_8;
-                    case GearCarrierOffStatus.kHz_7_3:
-                        return JotronCarrierOffStatusValues.kHz_7_3;
-                    case GearCarrierOffStatus.kHz_minus_7_3:
-                        return JotronCarrierOffStatusValues.kHz_minus_7_3;
-                    default:
-                        return JotronCarrierOffStatusValues.Off;
-                }
-
-            }
-
-            catch (Exception ex)
-            {
-                LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: Invalid" + ex + ". " + ToString(targetIp));
-                return JotronCarrierOffStatusValues.Off;
-            }
-        }
-        ////JOI FIN
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="targetIp"></param>
-        /// <param name="carrierOffstatus"></param>
-        /// <param name="openSession"></param>
-        /// <returns></returns>
-        private GearOperationStatus SNMPCarrierOffsetSet(String targetIp, GearCarrierOffStatus carrierOffstatus, bool isEmitter, Boolean openSession = true)
-        {
-            String logMethod = "CARRIEROFF SET";
-#if DEBUG
-            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
-                return GearOperationStatus.OK;
-#endif
-            if (openSession)
-            {
-                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
-                if (status != GearOperationStatus.OK)
-                    return status;
-            }
-            // JOI: 20170831
-            int i_rtimeout = 0;
-            while (i_rtimeout <= NUMMAXTimeout)
-            {
-                try
-                {
-                    SnmpClient.SetInt(
-                        targetIp,
-                        Community,
-                        u5ki.RemoteControlService.OIDs.RCJotron7000.CarrierOffStatus,
-                        Convert.ToInt32(ConvertCarrierOffsetJotron(carrierOffstatus, targetIp)),
-                        SNMPCallTimeout,
-                        Port,
-                        SNMPVersion);
-                    return GearOperationStatus.OK;
-                }
-                catch (Exception ex)
-                {
-                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
-                    {
-                        if (i_rtimeout >= NUMMAXTimeout)
-                        {
-                            return ExceptionTreatment(ex, logMethod, targetIp, carrierOffstatus.ToString(),
-                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                        }
-                        i_rtimeout++;
-                    }
-                    else
-                    {
-                        return ExceptionTreatment(ex, logMethod, targetIp, carrierOffstatus.ToString(),
-                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                    }
-                }
-            }
-            return GearOperationStatus.OK;
-            // JOI: 20170831 FIN
-        }
-
-        ////JOI
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="modulation"></param>
-        /// <param name="targetIp"></param>
-        /// <returns></returns>
-        private JotronModulationsValues ConvertModulationsJotron(GearModulations modulation, String targetIp)
-        {
-
-            String logMethod = "CNV MODULATION SET";
-
-            try
-            {
-                switch (modulation)
-                {
-                    case GearModulations.AM:
-                        return JotronModulationsValues.AM;
-                    case GearModulations.VDL2:
-                        return JotronModulationsValues.VDL2;
-                    default:
-                        return JotronModulationsValues.AM;
-                }
-            }
-
-            catch (Exception ex)
-            {
-                LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: Invalid" + ex + ". " + ToString(targetIp));
-                return JotronModulationsValues.AM;
-            }
-        }
-        ////JOI FIN
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="targetIp"></param>
-        /// <param name="modulation"></param>
-        /// <param name="openSession"></param>
-        /// <returns></returns>
-        private GearOperationStatus SNMPModulationSet(String targetIp, GearModulations modulation, bool isEmitter, Boolean openSession = true)
-        {
-            String logMethod = "MODULATION SET";
-#if DEBUG
-            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
-                return GearOperationStatus.OK;
-#endif
-            if (openSession)
-            {
-                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
-                if (status != GearOperationStatus.OK)
-                    return status;
-            }
-            // JOI: 20170831
-            int i_rtimeout = 0;
-            while (i_rtimeout <= NUMMAXTimeout)
-            {
-                try
-                {
-                    SnmpClient.SetInt(
-                        targetIp,
-                        Community,
-                        u5ki.RemoteControlService.OIDs.RCJotron7000.Modulation,
-                        Convert.ToInt32(ConvertModulationsJotron(modulation, targetIp)),
-                        SNMPCallTimeout,
-                        Port,
-                        SNMPVersion);
-                    LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: " + modulation + ". " + ToString(targetIp));
-                    return GearOperationStatus.OK;
-                }
-                catch (Exception ex)
-                {
-                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
-                    {
-                        if (i_rtimeout >= NUMMAXTimeout)
-                        {
-                            return ExceptionTreatment(ex, logMethod, targetIp, modulation.ToString(),
-                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                        }
-                        i_rtimeout++;
-                    }
-                    else
-                    {
-                        return ExceptionTreatment(ex, logMethod, targetIp, modulation.ToString(),
-                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                    }
-                }
-            }
-            return GearOperationStatus.OK;
-            // JOI: 20170831 FIN
-        }
-        
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="targetIp"></param>
-        /// <param name="level"></param>
-        /// <param name="power"></param>
-        /// <param name="openSession"></param>
-        /// <returns></returns>
-        //private GearOperationStatus SNMPPowerSet(String targetIp, GearPowerLevels level, Int32 power, bool isEmitter, Boolean openSession = true)
-        private GearOperationStatus SNMPPowerSet(String targetIp, Int32 power, bool isEmitter, Boolean openSession = true)
-        {
-            String logMethod = "POWER SET";
-
-#if DEBUG
-            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
-                return GearOperationStatus.OK;
-#endif
-            if (openSession)
-            {
-                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter,RCSessionTypes.Remote);
-                if (status != GearOperationStatus.OK)
-                    return status;
-            }
-            // JOI: 20170831
-            int i_rtimeout = 0;
-            while (i_rtimeout <= NUMMAXTimeout)
-            {
-                try
-                {
-
-                    // Set the power level.
-                    SnmpClient.SetInt(
-                        targetIp,
-                        Community,
-                        OID_JOTRON_TXAMPOWERFINE, // JOI: 20171031 ERROR #3231
-                        power,
-                        SNMPCallTimeout,
-                        Port,
-                        SNMPVersion);
-
-
-                    LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: [" + power + "]. " + ToString(targetIp));// JOI: 20171031
-                    return GearOperationStatus.OK;
-                }
-                catch (Exception ex)
-                {
-                    if (i_rtimeout >= NUMMAXTimeout)
-                    {
-                        return ExceptionTreatment(ex, logMethod, targetIp, power.ToString(),
-                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
-                    }
-                }
-                i_rtimeout++;
-            }
-            return GearOperationStatus.OK;
-            // JOI: 20170831 FIN
-        }
-
-        #endregion
-        
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="ip"></param>
-        /// <param name="Oid"></param>
-        /// <param name="sessionType"></param>
-        /// <param name="shortString"></param>
-        /// <returns></returns>
-        public string ToString(String ip = "", String Oid = "", RCSessionTypes sessionType = RCSessionTypes.Remote, Boolean shortString = true)
-        {
-            if (shortString)
-                return " {IP: " + ip + "}"
-                    + " {Port: " + Port + "}"
-                    + " {Community: " + Community + "}"
-                    + " {SNMPVersion: " + SNMPVersion + "}";
-            else
-                return " {IP: " + ip + "}"
-                    + " {Port: " + Port + "}"
-                    + " {OID: " + Oid + "}"
-                    + " {SessionType: " + sessionType + "}"
-                    + " {Community: " + Community + "}"
-                    + " {SNMPVersion: " + SNMPVersion + "}"
-                    + " {SNMPCallTimeout: " + SNMPCallTimeout + "}"
-                    + " {SessionTimeout: " + SessionTimeout + "}";
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns></returns>
-        public override string ToString()
-        {
-            return ToString();
-        }
-
-        /// <summary>
-        /// Obtiene las sesiones SIP establecidas con la radio. Formato: N,"xxx@0.0.0.0:nnn","xxx@0.0.0.0:nnn" N-Número de sesiones.. ID-SIP, ID-SIP.. 
-        /// MIB EUROCAE-ATC
-        /// </summary>
-        /// <param name="targetIp"></param>
-        /// <returns>GearOperationStatus</returns>
         private GearOperationStatus SNMPSessionListGet(String targetIp, String sipNdbx)
         {
 
@@ -1589,6 +1083,327 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             return GearOperationStatus.OK;
             // JOI: 20170831 FIN
         }
+
+        private String SNMPFrecuencyGet(String targetIp, bool isEmitter)
+        {
+            String logMethod = "FRECUENCY GET";
+#if DEBUG
+            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
+                return "ERROR: ByPass Active.";
+#endif
+            GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
+            if (status != GearOperationStatus.OK)
+                return "ERROR: Not able to read.";
+            // JOI: 20170831
+            int i_rtimeout = 0;
+            while (i_rtimeout <= NUMMAXTimeout)
+            {
+                try
+                {
+                    Int32 frecuency = SnmpClient.GetInt(
+                        targetIp,
+                        Community,
+                        u5ki.RemoteControlService.OIDs.RCJotron7000.Frecuency,
+                        SNMPCallTimeout,
+                        Port,
+                        SNMPVersion);
+
+                    return frecuency.ToString();
+                }
+                catch (Exception ex)
+                {
+                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
+                    {
+                        if (i_rtimeout >= NUMMAXTimeout)
+                        {
+                            ExceptionTreatment(ex, logMethod, targetIp);
+                            return null;
+                        }
+                        i_rtimeout++;
+                    }
+                    else
+                    {
+                        ExceptionTreatment(ex, logMethod, targetIp);
+                        return null;
+                    }
+                }
+
+            }
+            return "0000000";
+            // JOI: 20170831 FIN
+        }
+
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="targetIp"></param>
+        /// <param name="frecuency"></param>
+        /// <param name="isEmitter"></param>
+        /// <param name="openSession"></param>
+        /// <returns></returns>
+        private GearOperationStatus SNMPFrecuencySet(String targetIp, String frecuency, bool isEmitter, Boolean openSession = true)
+        {
+            String logMethod = "FRECUENCY SET";
+#if DEBUG
+            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
+                return GearOperationStatus.OK;
+#endif
+            if (openSession)
+            {
+                GearOperationStatus status = SNMPDeviceStatusGet(targetIp,isEmitter, RCSessionTypes.Remote);
+                if (status != GearOperationStatus.OK)
+                    return status;
+            }
+            
+            frecuency = frecuency.Replace(".", "");
+            frecuency = frecuency.Replace(",", "");
+            int frecuencia = Convert.ToInt32(frecuency);
+            // JOI: 20170831
+            int i_rtimeout = 0;
+            while (i_rtimeout <= NUMMAXTimeout)
+            {
+                try
+                {
+                    SnmpClient.SetInt(
+                        targetIp,
+                        Community,
+                        u5ki.RemoteControlService.OIDs.RCJotron7000.Frecuency,
+                        frecuencia,
+                        SNMPCallTimeout,
+                        Port,
+                        SNMPVersion);
+
+                    return GearOperationStatus.OK;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
+                    {
+                        if (i_rtimeout >= NUMMAXTimeout)
+                        {
+                            return ExceptionTreatment(ex, logMethod, targetIp, frecuency,
+                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                        }
+                        i_rtimeout++;
+                    }
+                    else
+                    {
+                        return ExceptionTreatment(ex, logMethod, targetIp, frecuency,
+                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                    }
+                }
+            }
+            return GearOperationStatus.OK;
+            // JOI: 20170831 FIN
+        }
+
+        private GearOperationStatus SNMPChannelSpacingSet(String targetIp, GearChannelSpacings channelSpacing, bool isEmitter, Boolean openSession = true)
+        {
+            String logMethod = "CHANNEL SPACING SET";
+#if DEBUG
+            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
+                return GearOperationStatus.OK;
+#endif
+            if (openSession)
+            {
+                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
+                if (status != GearOperationStatus.OK)
+                    return status;
+            }
+            // JOI: 20170831
+            int i_rtimeout = 0;
+            while (i_rtimeout <= NUMMAXTimeout)
+            {
+                try
+                {
+                    SnmpClient.SetInt(
+                        targetIp,
+                        Community,
+                        u5ki.RemoteControlService.OIDs.RCJotron7000.ChannelSpacing,
+                        Convert.ToInt32(ConvertChannelSpacingSet(channelSpacing, targetIp)),
+                        SNMPCallTimeout,
+                        Port,
+                        SNMPVersion);
+                    return GearOperationStatus.OK;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
+                    {
+                        if (i_rtimeout >= NUMMAXTimeout)
+                        {
+                            return ExceptionTreatment(ex, logMethod, targetIp, channelSpacing.ToString(),
+                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                        }
+                        i_rtimeout++;
+                    }
+                    else
+                    {
+                        return ExceptionTreatment(ex, logMethod, targetIp, channelSpacing.ToString(),
+                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                    }
+                }
+            }
+            return GearOperationStatus.OK;
+            // JOI: 20170831 FIN
+        }
+
+        private GearOperationStatus SNMPCarrierOffsetSet(String targetIp, GearCarrierOffStatus carrierOffstatus, bool isEmitter, Boolean openSession = true)
+        {
+            String logMethod = "CARRIEROFF SET";
+#if DEBUG
+            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
+                return GearOperationStatus.OK;
+#endif
+            if (openSession)
+            {
+                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
+                if (status != GearOperationStatus.OK)
+                    return status;
+            }
+            // JOI: 20170831
+            int i_rtimeout = 0;
+            while (i_rtimeout <= NUMMAXTimeout)
+            {
+                try
+                {
+                    SnmpClient.SetInt(
+                        targetIp,
+                        Community,
+                        u5ki.RemoteControlService.OIDs.RCJotron7000.CarrierOffStatus,
+                        Convert.ToInt32(ConvertCarrierOffsetJotron(carrierOffstatus, targetIp)),
+                        SNMPCallTimeout,
+                        Port,
+                        SNMPVersion);
+                    return GearOperationStatus.OK;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
+                    {
+                        if (i_rtimeout >= NUMMAXTimeout)
+                        {
+                            return ExceptionTreatment(ex, logMethod, targetIp, carrierOffstatus.ToString(),
+                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                        }
+                        i_rtimeout++;
+                    }
+                    else
+                    {
+                        return ExceptionTreatment(ex, logMethod, targetIp, carrierOffstatus.ToString(),
+                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                    }
+                }
+            }
+            return GearOperationStatus.OK;
+            // JOI: 20170831 FIN
+        }
+
+        private GearOperationStatus SNMPModulationSet(String targetIp, GearModulations modulation, bool isEmitter, Boolean openSession = true)
+        {
+            String logMethod = "MODULATION SET";
+#if DEBUG
+            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
+                return GearOperationStatus.OK;
+#endif
+            if (openSession)
+            {
+                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter, RCSessionTypes.Remote);
+                if (status != GearOperationStatus.OK)
+                    return status;
+            }
+            // JOI: 20170831
+            int i_rtimeout = 0;
+            while (i_rtimeout <= NUMMAXTimeout)
+            {
+                try
+                {
+                    SnmpClient.SetInt(
+                        targetIp,
+                        Community,
+                        u5ki.RemoteControlService.OIDs.RCJotron7000.Modulation,
+                        Convert.ToInt32(ConvertModulationsJotron(modulation, targetIp)),
+                        SNMPCallTimeout,
+                        Port,
+                        SNMPVersion);
+                    LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: " + modulation + ". " + ToString(targetIp));
+                    return GearOperationStatus.OK;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is Lextm.SharpSnmpLib.Messaging.TimeoutException)
+                    {
+                        if (i_rtimeout >= NUMMAXTimeout)
+                        {
+                            return ExceptionTreatment(ex, logMethod, targetIp, modulation.ToString(),
+                                U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                        }
+                        i_rtimeout++;
+                    }
+                    else
+                    {
+                        return ExceptionTreatment(ex, logMethod, targetIp, modulation.ToString(),
+                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                    }
+                }
+            }
+            return GearOperationStatus.OK;
+            // JOI: 20170831 FIN
+        }
+        
+        private GearOperationStatus SNMPPowerSet(String targetIp, Int32 power, bool isEmitter, Boolean openSession = true)
+        {
+            String logMethod = "POWER SET";
+
+#if DEBUG
+            if (Globals.Test.RemoteControlByPass && !Globals.Test.Gears.GearsReal.Contains(targetIp))
+                return GearOperationStatus.OK;
+#endif
+            if (openSession)
+            {
+                GearOperationStatus status = SNMPDeviceStatusGet(targetIp, isEmitter,RCSessionTypes.Remote);
+                if (status != GearOperationStatus.OK)
+                    return status;
+            }
+            // JOI: 20170831
+            int i_rtimeout = 0;
+            while (i_rtimeout <= NUMMAXTimeout)
+            {
+                try
+                {
+
+                    // Set the power level.
+                    SnmpClient.SetInt(
+                        targetIp,
+                        Community,
+                        OID_JOTRON_TXAMPOWERFINE, // JOI: 20171031 ERROR #3231
+                        power,
+                        SNMPCallTimeout,
+                        Port,
+                        SNMPVersion);
+
+
+                    LogTrace<RCJotron7000>("[SNMP][" + logMethod + "] value: [" + power + "]. " + ToString(targetIp));// JOI: 20171031
+                    return GearOperationStatus.OK;
+                }
+                catch (Exception ex)
+                {
+                    if (i_rtimeout >= NUMMAXTimeout)
+                    {
+                        return ExceptionTreatment(ex, logMethod, targetIp, power.ToString(),
+                            U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_GEAR_ITF_ERROR);
+                    }
+                }
+                i_rtimeout++;
+            }
+            return GearOperationStatus.OK;
+            // JOI: 20170831 FIN
+        }
+
+        #endregion
+        
 
         /// <summary>
         /// Controla los diferentes parámetros de configuración del equipo Master (Monocanal).
@@ -1713,32 +1528,170 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
         /// 
         /// </summary>
         /// <param name="watt"></param>
+
+        // JOI: 20171031 ERROR #3231 
+        #endregion
+
+
+        #region Convertidores de Valor
+
+        static readonly Dictionary<GearChannelSpacings, JotronChannelSpacingsValues> ChannelSpacingConvertDic = new Dictionary<GearChannelSpacings, JotronChannelSpacingsValues>()
+        {
+            {GearChannelSpacings.kHz_8_33,  JotronChannelSpacingsValues.jt_kHz_8_33},
+            {GearChannelSpacings.kHz_25_00,  JotronChannelSpacingsValues.jt_kHz_25_00}
+        };
+        private JotronChannelSpacingsValues ConvertChannelSpacingSet(GearChannelSpacings channelSpacing, String targetIp)
+        {
+            if (ChannelSpacingConvertDic.Keys.Contains(channelSpacing))
+                return ChannelSpacingConvertDic[channelSpacing];
+            return JotronChannelSpacingsValues.jt_kHz_25_00;
+        }
+
+        static readonly Dictionary<GearCarrierOffStatus, JotronCarrierOffStatusValues> CarrierOffsetConvertDic = new Dictionary<GearCarrierOffStatus, JotronCarrierOffStatusValues>()
+        {
+            { GearCarrierOffStatus.Off, JotronCarrierOffStatusValues.Off },
+            { GearCarrierOffStatus.kHz_7_5, JotronCarrierOffStatusValues.kHz_7_5 },
+            { GearCarrierOffStatus.kHz_5_0, JotronCarrierOffStatusValues.kHz_5_0 },
+            { GearCarrierOffStatus.kHz_2_5, JotronCarrierOffStatusValues.kHz_2_5 },
+            { GearCarrierOffStatus.Hz_0_0, JotronCarrierOffStatusValues.Hz_0_0 },
+            { GearCarrierOffStatus.kHz_minus_2_5, JotronCarrierOffStatusValues.kHz_minus_2_5 },
+            { GearCarrierOffStatus.kHz_minus_5_0, JotronCarrierOffStatusValues.kHz_minus_5_0 },
+            { GearCarrierOffStatus.kHz_minus_7_5, JotronCarrierOffStatusValues.kHz_minus_7_5 },
+            { GearCarrierOffStatus.kHz_8, JotronCarrierOffStatusValues.kHz_8 },
+            { GearCarrierOffStatus.kHz_4, JotronCarrierOffStatusValues.kHz_4 },
+            { GearCarrierOffStatus.kHz_minus_4, JotronCarrierOffStatusValues.kHz_minus_4 },
+            { GearCarrierOffStatus.kHz_minus_8, JotronCarrierOffStatusValues.kHz_minus_8 },
+            { GearCarrierOffStatus.kHz_7_3, JotronCarrierOffStatusValues.kHz_7_3 },
+            { GearCarrierOffStatus.kHz_minus_7_3, JotronCarrierOffStatusValues.kHz_minus_7_3 },
+        };
+        private JotronCarrierOffStatusValues ConvertCarrierOffsetJotron(GearCarrierOffStatus carrierOffstatus, String targetIp)
+        {
+            if (CarrierOffsetConvertDic.Keys.Contains(carrierOffstatus))
+                return CarrierOffsetConvertDic[carrierOffstatus];
+            return JotronCarrierOffStatusValues.Off;
+        }
+
+        static readonly Dictionary<GearModulations, JotronModulationsValues> ModulationConvertDic = new Dictionary<GearModulations, JotronModulationsValues>()
+        {
+            { GearModulations.AM, JotronModulationsValues.AM },
+            { GearModulations.VDL2, JotronModulationsValues.VDL2 }
+        };
+        private JotronModulationsValues ConvertModulationsJotron(GearModulations modulation, String targetIp)
+        {
+            if (ModulationConvertDic.Keys.Contains(modulation))
+                return ModulationConvertDic[modulation];
+            return JotronModulationsValues.AM;
+        }
+
+        public readonly Int32 PowerLevelMin = 300;
+        public readonly Int32 PowerLevelMax = 470;
+        public readonly Int32 PowerLevelDefault = 470;
         private Int32 ConvertWattTodBm(Int32 pot)
         {
             Double watt = pot;
             Int32 dBm = 0;
 
-            dBm = (Int32)( 10 * (10 * Math.Log10((watt/1)) + 30));
+            dBm = (Int32)(10 * (10 * Math.Log10((watt / 1)) + 30));
 
-            if ( dBm < PowerLevelMin)
+            if (dBm < PowerLevelMin)
             {
                 dBm = PowerLevelMin;
-                LogInfo<RCRohde4200>(" Equipo configurado con potencia mínima por defecto ",
-                    U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_CONFIGURATION_ERROR,
-                    Id, CTranslate.translateResource("Asignación potencia mínima en equipo N Jotron "));
             }
             else if (dBm > PowerLevelMax)
             {
                 dBm = PowerLevelMax;
-                LogInfo<RCRohde4200>(" Equipo configurado con potencia por defecto ",
-                    U5kiIncidencias.U5kiIncidencia.U5KI_NBX_NM_CONFIGURATION_ERROR,
-                    Id, CTranslate.translateResource("Asignación potencia máxima en equipo N Jotron "));
             }
             return dBm;
         }
 
-        // JOI: 20171031 ERROR #3231 
-        #endregion
+        private bool HayAlarmaPermanenteTx(Byte[] deviceStatus)
+        {
+            Byte[] sStatus = { 0 };
+
+            // Analizamos primer bloque
+            // txAlarm(7)---->Viene activo en este punto, txPaModuleAlarm(6), txModModuleAlarm(5), txFrontModuleAlarm(4),
+            // txMainModuleAlarm(3),txExternalAlarm(2),txForcedAlarm(1)---->No se gestiona,txExtUnitAlarm(0)
+            Buffer.BlockCopy(deviceStatus, 2, sStatus, 0, 1);
+            BitArray bits = new BitArray(sStatus);
+            if (bits[6] == true || bits[5] == true || bits[4] == true || bits[3] == true ||
+                bits[2] == true || bits[0] == true)
+                return true;
+
+            // Analizamos segundo bloque
+            // txPASWRAlarm(7),txPACurrentAlarm(6),txPATemperatureAlarm(5),txPA28V0Alarm(4),
+            // txPA12V0Alarm(3),txPA5V0Alarm(2),txPA3V3Alarm(1),txPA5V0Neg(0)
+            Buffer.BlockCopy(deviceStatus, 3, sStatus, 0, 1);
+            BitArray bits1 = new BitArray(sStatus);
+            if (bits1[7] == true || bits1[6] == true || bits1[5] == true || bits1[4] == true ||
+                bits1[3] == true || bits1[2] == true || bits1[1] == true || bits1[0] == true)
+                return true;
+
+            // Analizamos tercer bloque
+            // txPAFanFailure(7),txPAPwrOutAlarm(6),txRFTuneAlarm(5),txModLoLvlAlarm(4),
+            // txModLoLockAlarm(3),txMod6V0Alarm(2),txPowerACAlarm(1),txMainInStby(0),
+            Buffer.BlockCopy(deviceStatus, 4, sStatus, 0, 1);
+            BitArray bits2 = new BitArray(sStatus);
+            if (bits2[7] == true || bits2[6] == true || bits2[5] == true || bits2[4] == true ||
+                bits2[3] == true || bits2[2] == true || bits2[1] == true || bits2[0] == true)
+                return true;
+
+            // Analizamos cuarto bloque
+            // txMainEthernetAlarm(7),txMainCodecAlarm(6),txMainSPIAlarm(5),txMainFrontAlarm(4)
+            // txMainRemExpAlarm(3),txMainBiteADCAlarm(2),txMainMemAlarm(1),txSpareAlarm31(0)
+            Buffer.BlockCopy(deviceStatus, 5, sStatus, 0, 1);
+            BitArray bits3 = new BitArray(sStatus);
+            if (bits3[7] == true || bits3[6] == true || bits3[5] == true || bits3[4] == true ||
+                bits3[3] == true || bits3[2] == true || bits3[1] == true || bits3[0] == true)
+                return true;
+
+            return false;
+        }
+
+        private bool HayAlarmaPermanenteRx(Byte[] deviceStatus)
+        {
+            Byte[] sStatus = { 0 };
+
+            // Analizamos primer bloque
+            // rxAlarm(7)---->Viene activo en este punto, rxRfModuleAlarm(6), rxPowerModuleAlarm(5), rxFrontModuleAlarm(4),
+            // rxMainModuleAlarm(3),rxExternalAlarm(2),rxForcedAlarm(1)---->No se gestiona,rxExtUnitAlarm(0)
+            Buffer.BlockCopy(deviceStatus, 2, sStatus, 0, 1);
+            BitArray bits = new BitArray(sStatus);
+            if (bits[6] == true || bits[5] == true || bits[4] == true || bits[3] == true ||
+                bits[2] == true || bits[0] == true)
+                return true;
+
+            // Analizamos segundo bloque
+            // rxRFLoLvlAlarm(7),rxRFLoLockAlarm(6),rxRF6V0Alarm(5),rxRFLNACurrentAlarm(4),
+            // rxRFIFCurrentAlarm(3),rxRF30V0Alarm(2),rxSpareAlarm14(1),rxPowerACAlarm(0)
+            Buffer.BlockCopy(deviceStatus, 3, sStatus, 0, 1);
+            BitArray bits1 = new BitArray(sStatus);
+            if (bits1[7] == true || bits1[6] == true || bits1[5] == true || bits1[4] == true ||
+                bits1[3] == true || bits1[2] == true || bits1[1] == true || bits1[0] == true)
+                return true;
+
+            // Analizamos tercer bloque
+            // rxPower12V0Alarm(7),rxPower5V0Alarm(6),rxPower3V3Alarm(5),rxPowerTempAlarm(4),
+            // rxPowerCurrentAlarm(3),rxPowerDCInputAlarm(2),rxCodecLDAlarm(1),rxMainAGCAlarm(0)
+            Buffer.BlockCopy(deviceStatus, 4, sStatus, 0, 1);
+            BitArray bits2 = new BitArray(sStatus);
+            if (bits2[7] == true || bits2[6] == true || bits2[5] == true || bits2[4] == true ||
+                bits2[3] == true || bits2[2] == true || bits2[1] == true || bits2[0] == true)
+                return true;
+
+            // Analizamos cuarto bloque
+            // rxMainEthernetAlarm(7),rxMainCodecAlarm(6),rxMainSPIAlarm(5)rxMainFrontAlarm(4),
+            // rxMainRemExpAlarm(3),rxMainBiteADCAlarm(2),rxMainMemAlarm(1),rxMainIFAlarm(0)
+            Buffer.BlockCopy(deviceStatus, 5, sStatus, 0, 1);
+            BitArray bits3 = new BitArray(sStatus);
+            if (bits3[7] == true || bits3[6] == true || bits3[5] == true || bits3[4] == true ||
+                bits3[3] == true || bits3[2] == true || bits3[1] == true || bits3[0] == true)
+                return true;
+
+            return false;
+        }
+        
+        #endregion Convertidores de Valor
+
 
         #region IRemoteControl
 
@@ -1759,6 +1712,27 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
 
         #endregion IRemoteControl
 
+        #region Public
+
+        public string ToString(String ip = "", String Oid = "", RCSessionTypes sessionType = RCSessionTypes.Remote, Boolean shortString = true)
+        {
+            if (shortString)
+                return " {IP: " + ip + "}"
+                    + " {Port: " + Port + "}"
+                    + " {Community: " + Community + "}"
+                    + " {SNMPVersion: " + SNMPVersion + "}";
+            else
+                return " {IP: " + ip + "}"
+                    + " {Port: " + Port + "}"
+                    + " {OID: " + Oid + "}"
+                    + " {SessionType: " + sessionType + "}"
+                    + " {Community: " + Community + "}"
+                    + " {SNMPVersion: " + SNMPVersion + "}"
+                    + " {SNMPCallTimeout: " + SNMPCallTimeout + "}"
+                    + " {SessionTimeout: " + SessionTimeout + "}";
+        }
+
+        #endregion Public
 
     }
 }

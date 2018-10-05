@@ -69,6 +69,23 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 SessionErrorsTreatment(strproc, res, x);
             });
         }
+        protected SnmpDataSet GetSet(string strproc, SnmpDataSet set)
+        {
+            SnmpDataSet retorno = null;
+            snmpi.Get(TargetEndp, set , (res, val, x) =>                
+            {
+                retorno = val as SnmpDataSet;
+                SessionErrorsTreatment(strproc, res, x);
+            });
+            return retorno;
+        }
+        protected void SetSet(string strproc, SnmpDataSet set)
+        {
+            snmpi.Set(TargetEndp, set, (res, val, x) =>
+            {
+                SessionErrorsTreatment(strproc, res, x);
+            });
+        }
         protected void SessionErrorsTreatment(String strProc, SnmpInterfazResult res, Exception ex)
         {
             if (res != SnmpInterfazResult.Ok)
