@@ -25,7 +25,7 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
     {
         #region Enums
         //JOI
-        enum JotronCarrierOffStatusValues
+        public enum JotronCarrierOffStatusValues
         {
             Off = 7,
             kHz_7_5 = 12,
@@ -43,7 +43,7 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             kHz_minus_7_3 = 3
         }
 
-        enum JotronModulationsValues
+        public enum JotronModulationsValues
         {
             AM = 1,
             AMMSK = 2,
@@ -52,14 +52,14 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             DSC = 5
         }
 
-        enum JotronEventLevelValues
+        public enum JotronEventLevelValues
         {
             jt_Ok = 0,
             jt_Warning = 1,
             jt_Error = 2
         }
 
-        enum JotronIndexOperationalStateValues
+        public enum JotronIndexOperationalStateValues
         {
 
             keyInp = 0,                 //There is an active key input to the radio (tx) or the txBusy input is low (rx)
@@ -83,12 +83,12 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             telsaBusy = 18              //The radio has enabled Telsa filter, and Telsafilter is not ready/cmd not present.
         }
 
-        enum JotronNumParamOperationalStateValues
+        public enum JotronNumParamOperationalStateValues
         {
             jt_NumParamOk = 2
         }
 
-        enum JotronOperModeValues
+        public enum JotronOperModeValues
         {
             jt_reset = 1,
             jt_main = 2,
@@ -97,27 +97,27 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             test = 5 // Do not use (internal)
         }
 
-        enum JotronForceLowPowerValues
+        public enum JotronForceLowPowerValues
         {
             jt_true = 1,
             jt_false = 2
 
         }
 
-        enum JotronInServiceModeValues
+        public enum JotronInServiceModeValues
         {
             jt_true = 1,
             jt_false = 2
 
         }
 
-        enum JotronChannelSpacingsValues
+        public enum JotronChannelSpacingsValues
         {
             jt_kHz_8_33 = 1,
             jt_kHz_25_00 = 2
         }
 
-        enum JotronAnalogInputModulationSourceTxValues
+        public enum JotronAnalogInputModulationSourceTxValues
         {
             jt_AIMST_Auto = 1,
             jt_AIMST_LineIn = 2,
@@ -129,6 +129,37 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
         #endregion Enums.
 
         #region Sesion Snmp
+
+        public class RCJotronRawData
+        {
+            public string DeviceStatus { get; set; }
+            public object OperationalMode { get; set; }
+            public string OperationalStatusATC { get; set; }
+            public Int32? InServiceMode { get; set; }
+            public string SipSessionList { get; set; }
+            public Int32? Frequency { get; set; }
+            public Int32? ChannelSpacing { get; set; }
+            public Int32? Modulation { get; set; }
+            public string PermanentAlarm { get; set; }
+            public Int32? CarrierOffStatus { get; set; }
+            public Int32? TxAnaModSource { get; set; }
+            public object TxPowerModeOid { get; set; }
+            public string TxPowerVal { get; set; }
+        }
+
+        public class RCJotronProcessedData
+        {
+            public bool PermanentAlarms { get; set; }
+            public bool DeviceStatusAlarmsInBlock2 { get; set; }
+            public bool DeviceStatusAlarmsInBlock3 { get; set; }
+            public bool SipSessionsAlarm { get; set; }
+            public Object OperationalStatusATCCommand { get; set; }
+            public JotronEventLevelValues OperationalStatusATCState { get; set; }
+            public JotronInServiceModeValues InserviceMode { get; set; }
+            public JotronAnalogInputModulationSourceTxValues TxAnaModSource { get; set; }
+            public Int32? Power { get; set; }
+
+        }
 
         /** */
         class JotronSnmpSession : GenericSnmpSession
@@ -198,7 +229,7 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
             {
                 get
                 {
-                    snmpi.Get<int>(TargetEndp, DeviceStatusOid + OidBase, (res, val, x) =>
+                    snmpi.Get<int>(TargetEndp, DeviceStatusOid, (res, val, x) =>
                     {
                         SessionErrorsTreatment("Status Get", res, x);
                         if (SessionErrors.Count == 0)
@@ -290,60 +321,62 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
 
             #endregion
 
-            public JotronSnmpSession(IPEndPoint endp, string rid) : base()
+            public JotronSnmpSession(IPEndPoint endp, string rid, 
+                int timeout = 0, int reint = 1, string Community = "public") : base()
             {
+                snmpi = new SnmpInterfaz() { Community = Community, Timeout = timeout, Reint = reint };
                 TargetEndp = endp;
                 Rid = rid;
                 SessionErrors = new List<dynamic>();
             }
 
-            public dynamic GetRawEquipmentData(bool isTx)
+            public RCJotronRawData GetRawEquipmentData(bool isTx)
             {
                 var dic = (isTx ? CommonDataSetForRead.Union(TxOnlyDataSetForRead) : CommonDataSetForRead.Union(RxOnlyDataSetForRead)) as SnmpDataSet;
 
                 dic = GetSet("GetRawEquipmentData", dic);
 
-                if (isTx) return new
+                if (isTx) return new RCJotronRawData
                 {
-                    DeviceStatus = dic[DeviceStatusOid],
+                    DeviceStatus = dic[DeviceStatusOid] as string,
                     OperationalMode = dic[OperationalModeOid],
-                    OperationalStatusATC = dic[OperationalStatusATCOid],
-                    InServiceMode = dic[InServiceModeOid],
-                    SipSessionList = dic[OID_EUROCONTROL_VOSIPSESSIONLIST],
-                    Frequency = dic[FrequencyOid],
-                    ChannelSpacing = dic[ChannelSpacingOid],
-                    Modulation = dic[ModulationOid],
-                    PermanentAlarm = dic[OID_JOTRON_ALARMAS_PERMANENTES_TX],
-                    CarrierOffStatus = dic[CarrierOffStatusOid],
-                    TxAnaModSource = dic[TxAnaModSourceOid],
+                    OperationalStatusATC = dic[OperationalStatusATCOid] as string,
+                    InServiceMode = dic[InServiceModeOid] as Int32?,
+                    SipSessionList = dic[OID_EUROCONTROL_VOSIPSESSIONLIST] as string,
+                    Frequency = dic[FrequencyOid] as Int32?,
+                    ChannelSpacing = dic[ChannelSpacingOid] as Int32?,
+                    Modulation = dic[ModulationOid] as Int32?,
+                    PermanentAlarm = dic[OID_JOTRON_ALARMAS_PERMANENTES_TX] as string,
+                    CarrierOffStatus = dic[CarrierOffStatusOid] as Int32?,
+                    TxAnaModSource = dic[TxAnaModSourceOid] as Int32?,
                     TxPowerModeOid = dic[TxPowerModeOid],
-                    TxPowerVal = dic[OID_JOTRON_TXAMPOWERFINE]
+                    TxPowerVal = dic[OID_JOTRON_TXAMPOWERFINE] as string
                 };
-                else return new
+                else return new RCJotronRawData
                 {
-                    DeviceStatus = dic[DeviceStatusOid],
+                    DeviceStatus = dic[DeviceStatusOid] as string,
                     OperationalMode = dic[OperationalModeOid],
-                    OperationalStatusATC = dic[OperationalStatusATCOid],
-                    InServiceMode = dic[InServiceModeOid],
-                    SipSessionList = dic[OID_EUROCONTROL_VOSIPSESSIONLIST],
-                    Frequency = dic[FrequencyOid],
-                    ChannelSpacing = dic[ChannelSpacingOid],
-                    Modulation = dic[ModulationOid],
-                    PermanentAlarm = dic[OID_JOTRON_ALARMAS_PERMANENTES_RX]
+                    OperationalStatusATC = dic[OperationalStatusATCOid] as string,
+                    InServiceMode = dic[InServiceModeOid] as Int32?,
+                    SipSessionList = dic[OID_EUROCONTROL_VOSIPSESSIONLIST] as string,
+                    Frequency = dic[FrequencyOid] as Int32?,
+                    ChannelSpacing = dic[ChannelSpacingOid] as Int32?,
+                    Modulation = dic[ModulationOid] as Int32?,
+                    PermanentAlarm = dic[OID_JOTRON_ALARMAS_PERMANENTES_RX] as string
                 };
             }
 
-            public void SetRawEquipmentData(bool isTx, dynamic data)
+            public void SetRawEquipmentData(bool isTx, RCJotronRawData data)
             {
                 if (isTx)
                 {
                     var dic = (SnmpDataSet)CommonDataSetForWrite.Union(TxOnlyDataSetForWrite);
 
-                    dic[FrequencyOid] = GeneralHelper.PropertyExists(data, "Frequency") ? data.Frequency : null;
-                    dic[ChannelSpacingOid] = GeneralHelper.PropertyExists(data, "ChannelSpacing") ? data.ChannelSpacing : null;
-                    dic[ModulationOid] = GeneralHelper.PropertyExists(data, "Modulation") ? data.Modulation : null;
-                    dic[CarrierOffStatusOid] = GeneralHelper.PropertyExists(data, "CarrierOffStatus") ? data.CarrierOffStatus : null;
-                    dic[OID_JOTRON_TXAMPOWERFINE] = GeneralHelper.PropertyExists(data, "TxPowerVal") ? data.TxPowerVal : null;
+                    dic[FrequencyOid] = data.Frequency;             // GeneralHelper.PropertyExists(data, "Frequency") ? data.Frequency : null;
+                    dic[ChannelSpacingOid] = data.ChannelSpacing;   // GeneralHelper.PropertyExists(data, "ChannelSpacing") ? data.ChannelSpacing : null;
+                    dic[ModulationOid] = data.Modulation;           // GeneralHelper.PropertyExists(data, "Modulation") ? data.Modulation : null;
+                    dic[CarrierOffStatusOid] = data.CarrierOffStatus; // GeneralHelper.PropertyExists(data, "CarrierOffStatus") ? data.CarrierOffStatus : null;
+                    dic[OID_JOTRON_TXAMPOWERFINE] = data.TxPowerVal;// GeneralHelper.PropertyExists(data, "TxPowerVal") ? data.TxPowerVal : null;
 
                     SetSet("SetRawEquipmentData", dic);
                 }
@@ -351,37 +384,34 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
                 {
                     var dic = (SnmpDataSet)CommonDataSetForWrite.Union(CommonDataSetForWrite);
 
-                    dic[FrequencyOid] = GeneralHelper.PropertyExists(data, "Frequency") ? data.Frequency : null;
-                    dic[ChannelSpacingOid] = GeneralHelper.PropertyExists(data, "ChannelSpacing") ? data.ChannelSpacing : null;
-                    dic[ModulationOid] = GeneralHelper.PropertyExists(data, "Modulation") ? data.Modulation : null;
+                    dic[FrequencyOid] = data.Frequency;              // GeneralHelper.PropertyExists(data, "Frequency") ? data.Frequency : null;
+                    dic[ChannelSpacingOid] = data.ChannelSpacing;    // GeneralHelper.PropertyExists(data, "ChannelSpacing") ? data.ChannelSpacing : null;
+                    dic[ModulationOid] = data.Modulation;            // GeneralHelper.PropertyExists(data, "Modulation") ? data.Modulation : null;
 
                     SetSet("SetRawEquipmentData", dic);
                 }
 
             }
 
+            public dynamic ToProccesedData(RCJotronRawData inputdata)
+            {
+                return null;
+            }
+
+            public RCJotronRawData ToRawData(dynamic inputdata)
+            {
+                return null;
+            }
         }
 
         #endregion Sesion SNMP
 
         #region Declarations
 
-        public readonly Int32 Port = 160;
-
         public readonly String Community = "public";
         public readonly Int32 SessionTimeout = 999;
-        //public readonly VersionCode SNMPVersion = VersionCode.V1;
-        public readonly Int32 SNMPCallTimeout = 500; // Miliseconds = 1,0 seconds antes 0,5
+        public readonly Int32 SNMPCallTimeout = 500;        // Miliseconds = 1,0 seconds antes 0,5
         public readonly Int32 NUMMAXTimeout = 1;
-        // JOI: 20171031 ERROR #3231 
-        // JOI: 20171031 ERROR #3231
-
-        // private static Logger _logger = LogManager.GetCurrentClassLogger();
-        //public string Name { get { return U5ki.Infrastructure.Resources.ServiceNames.RemoteControlService; } }
-        //private Action<GearOperationStatus> _response;
-        //private Action<String> _responseString;
-        //private Thread _thread;
-        
 
         //JOI. CONTROL_ALARMAS_PERMANENTES
         private bool bcontrol_alarmas_permanentes = true;   // TODO... u5ki.RemoteControlService.Properties.Settings.Default.ControlAlarmasPermanentes;
@@ -392,43 +422,10 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
         private string sipNdbx = "user@127.0.0.1";          // TODO... { get { return Properties.Settings.Default.SipUser + "@" + Properties.Settings.Default.SipIp; } }
         // JOI. CONTROL_SIP FIN.
  
-        // JOI. CONTROL_EQUIPO_EN_ALARMA.(20170616)
-        // JOI. CONTROL_EQUIPO_EN_ALARMA FIN.
-
-        // JOI: 20171031 ERROR #3231 
-        // JOI: 20171031 ERROR #3231
-
         // JOI. CONTROL_SET_SIP
-        private int delaySetFrequencyMs = 1500;     // TODO... Convert.ToInt32(u5ki.RemoteControlService.Properties.Settings.Default.DelaySetFrequencyMs);
+        private int delaySetFrequencyMs = 1500;             // TODO... Convert.ToInt32(u5ki.RemoteControlService.Properties.Settings.Default.DelaySetFrequencyMs);
         // JOI. CONTROL_SET_SIP FIN.
-        //JOI FIN
         #endregion
-
-        /// <summary>
-        /// 
-        /// </summary>
-        public RCJotron7000()
-        {
-        }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="port"></param>
-        public RCJotron7000(Int32 port)
-        {
-            Port = port;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="port"></param>
-        /// <param name="sNMPVersion"></param>
-        public RCJotron7000(Int32 port, VersionCode sNMPVersion)
-        {
-            Port = port;
-            SNMPVersion = sNMPVersion;
-        }
 
         #region Logic
 

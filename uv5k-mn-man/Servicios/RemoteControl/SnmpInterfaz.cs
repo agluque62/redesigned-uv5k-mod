@@ -292,8 +292,8 @@ namespace uv5k_mn_mod.Servicios.RemoteControl
         //    return (data is Integer32) ? ((Integer32)data).ToInt32() : -1;
         //}
 
-        protected int Timeout { get; set; }
-        protected int Reint { get; set; }
-        protected string Community { get; set; }
+        public int Timeout { get; set; }
+        public int Reint { get; set; }
+        public string Community { get; set; }
     }
 }
