@@ -24,6 +24,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Doc", "Doc", "{7F46B27C-2FD
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DspAudioQualityTesting", "DspAudioQualityTesting\DspAudioQualityTesting.vcxproj", "{A490601B-C31D-458B-AF79-C6F719D9AAAC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DspAudioQualityLib", "DspAudioQualityLib\DspAudioQualityLib.vcxproj", "{78CCDDC5-5418-476F-A33D-800A69B78D39}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,6 +70,16 @@ Global
 		{A490601B-C31D-458B-AF79-C6F719D9AAAC}.Release|x64.Build.0 = Release|x64
 		{A490601B-C31D-458B-AF79-C6F719D9AAAC}.Release|x86.ActiveCfg = Release|Win32
 		{A490601B-C31D-458B-AF79-C6F719D9AAAC}.Release|x86.Build.0 = Release|Win32
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Debug|x64.ActiveCfg = Debug|x64
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Debug|x64.Build.0 = Debug|x64
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Debug|x86.ActiveCfg = Debug|Win32
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Debug|x86.Build.0 = Debug|Win32
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Release|Any CPU.ActiveCfg = Release|Win32
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Release|x64.ActiveCfg = Release|x64
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Release|x64.Build.0 = Release|x64
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Release|x86.ActiveCfg = Release|Win32
+		{78CCDDC5-5418-476F-A33D-800A69B78D39}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
