@@ -22,3 +22,4 @@ int ChannelProcess::GetQualityValue()
 {
 	return quality_indicator(&pdata);
 }
+

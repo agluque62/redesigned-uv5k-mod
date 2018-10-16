@@ -34,6 +34,8 @@ extern "C" {
 		char fproc;	// JJA Flag para indicar que se ha realizado el procesamiento interno (process_internal)
 
 		float fDebug;
+		/** AGL.. */
+		float sample_max;
 	} processor_data_t;
 
 	/*

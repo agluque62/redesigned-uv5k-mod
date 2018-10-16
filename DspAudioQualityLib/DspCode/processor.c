@@ -220,7 +220,7 @@ static void process_internal (processor_data_t * data)
 	/* calculus of quality as the product of cepsSNR and frequency variation */
 	quality.real = 35 * cepsFreqSnr.real * cepsFreqSt.real - 1;
 
-	//if (power.real < 5e-4)
+	// if (power.real < 5e-4)  // AGL
 	if (power.real < 5000)	//JJA
 		quality.real = 0;
 
@@ -300,6 +300,8 @@ int process(processor_data_t * data, float * v, int count)
 	int i;
 	for (i = 0; i < count; i++, data->cBlockPos++)
 	{
+		float abs_sample = abs_float(v[i]);
+		if (abs_sample > data->sample_max) data->sample_max = abs_sample;
 
 		data->cBlock[data->cBlockPos].real = v[i];
 		data->cBlock[data->cBlockPos].imaginary = 0;

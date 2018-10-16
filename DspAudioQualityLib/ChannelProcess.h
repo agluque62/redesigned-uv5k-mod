@@ -12,6 +12,7 @@ public:
 public:
 	void ProccessData(float *pfData, int count);
 	int GetQualityValue();
+	float GetSampleMax() { return pdata.sample_max; }
 private:
 	processor_data pdata;
 
