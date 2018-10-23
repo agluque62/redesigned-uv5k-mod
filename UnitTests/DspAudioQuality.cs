@@ -75,6 +75,8 @@ namespace UnitTests
     public class DspAudioQuality
     {
         const string inPath = @"FE-00001.wav";
+        const string inPath1 = @"Tono440.wav";
+
         const int BlockSize = 48;
         int CallControl = (int)Math.Round((Decimal)(512.0 / BlockSize), MidpointRounding.AwayFromZero);
 
@@ -86,7 +88,7 @@ namespace UnitTests
             float sample_in_max = 0, sample_proc_max = 0;
             List<int> quality = new List<int>();
 
-            using (var reader = new AudioFileReader(inPath))
+            using (var reader = new AudioFileReader(inPath1))
             {
                 float[] buffer = new float[BlockSize];
                 int read, testq = 0;
@@ -141,6 +143,7 @@ namespace UnitTests
             public double time { get; set; }
             public double maxticks { get; set; }
             public double maxtime { get; set; }
+            public double inonemsec { get; set; }
 
             public TestResult()
             {
@@ -164,6 +167,7 @@ namespace UnitTests
 
                 res.maxticks = res.maxticks < stopWatch.ElapsedTicks ? stopWatch.ElapsedTicks : res.maxticks;
                 res.maxtime = res.maxticks / Stopwatch.Frequency;
+                res.inonemsec = (1 / res.time)/1000;
             }
 
             return res;
@@ -207,6 +211,8 @@ namespace UnitTests
 
                         res.maxticks = res.maxticks < stopWatch.ElapsedTicks ? stopWatch.ElapsedTicks : res.maxticks;
                         res.maxtime = res.maxticks / Stopwatch.Frequency;
+
+                        res.inonemsec = (1 / res.time) / 1000;
 
                         if ((++testq % CallControl) == 0)
                         {
