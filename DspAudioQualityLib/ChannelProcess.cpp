@@ -23,3 +23,8 @@ int ChannelProcess::GetQualityValue()
 	return quality_indicator(&pdata);
 }
 
+void ChannelProcess::RoutineTest(int routine) 
+{
+	routine_test(routine);
+}
+

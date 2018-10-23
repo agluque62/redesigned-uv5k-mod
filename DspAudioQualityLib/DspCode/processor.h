@@ -36,6 +36,8 @@ extern "C" {
 		float fDebug;
 		/** AGL.. */
 		float sample_max;
+
+		int cnt1, cnt2;
 	} processor_data_t;
 
 	/*
@@ -69,6 +71,8 @@ extern "C" {
 	 * data: puntero a la estructura de datos asignada a la señal a evaluar
 	 */
 	float quality_indicator_float(processor_data_t * data);
+
+	void routine_test(int routine);
 
 #ifdef __cplusplus
 }

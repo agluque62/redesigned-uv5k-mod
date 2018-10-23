@@ -279,11 +279,16 @@ void processor_init(processor_data_t * data, int instanceid)
 
 	data->fproc=0;	// JJA
 
+	data->cnt1 = data->cnt2 = 0;
+
 }
 
 int process(processor_data_t * data, float * v, int count)
 {
+
 	int _ret=0;
+
+	data->cnt1++;
 	
 	complex_num * nextBlock = (data->cBlock == data->cBlock0)?data->cBlock1:data->cBlock0;
 
@@ -326,6 +331,7 @@ int process(processor_data_t * data, float * v, int count)
 			//else
    //				_ret=-2; // No procesamos el BSS para distribuir la carga (ya se hara despues si se puede)
 
+			data->cnt2++;
 			process_internal(data);
 
 			data->cBlock = nextBlock;
@@ -336,3 +342,35 @@ int process(processor_data_t * data, float * v, int count)
 
 	return _ret;
 }
+
+/* AGL para el benchmark de las rutinas */
+complex_num test_vector[PROCESSOR_BLOCK_SIZE];
+complex_num test_vector_out[PROCESSOR_BLOCK_SIZE];
+void routine_test(int routine)
+{
+	switch (routine)
+	{
+	case 0:			// Power
+		signalPower(test_vector, PROCESSOR_BLOCK_SIZE);
+		break;
+	case 1:			// Windowing
+		window(test_vector, PROCESSOR_HANN_WINDOW, PROCESSOR_BLOCK_SIZE);
+		break;
+	case 2:			// FFT
+		fft(test_vector, test_vector_out);
+		break;
+	case 3:			// LOG Complex
+		abs_log_complex(test_vector, PROCESSOR_BLOCK_SIZE);
+		break;
+	case 4:			// IFFT
+		ifft(test_vector, test_vector_out);
+		break;
+	case 5:			// ABS Complex
+		abs_complex(test_vector, PROCESSOR_BLOCK_SIZE);
+		break;
+
+	default:
+		break;
+	}
+}
+

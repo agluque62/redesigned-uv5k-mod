@@ -13,6 +13,8 @@ public:
 	void ProccessData(float *pfData, int count);
 	int GetQualityValue();
 	float GetSampleMax() { return pdata.sample_max; }
+
+
 private:
 	processor_data pdata;
 
@@ -53,6 +55,7 @@ public:
 		}	
 		return NULL;		
 	}
+	static void RoutineTest(int routine);
 
 	static ChannelProcess *instances[CHANNELS_MAX_NUMBER];	
 };
