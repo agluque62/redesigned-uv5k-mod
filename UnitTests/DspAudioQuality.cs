@@ -28,6 +28,8 @@ namespace UnitTests
         static extern void DAQCloseInstance(int instance);
         [DllImport("DspAudioQualityLib.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
         static extern void DAQRoutineTest(int routine);
+        [DllImport("DspAudioQualityLib.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi, ExactSpelling = true)]
+        public static extern void DAQTwiddleGeneratorTest();
 
         #endregion DspAudioQualityLib
 
@@ -137,6 +139,15 @@ namespace UnitTests
             double Total = AudioFile.maxtime;
         }
 
+        [TestMethod]
+        public void TwiddleGeneratorTest()
+        {
+            gen_twiddle(512);
+
+            Test(6, 1000);
+            DspAudioQualityLib.DAQTwiddleGeneratorTest();
+        }
+
         class TestResult
         {
             public double ticks { get; set; }
@@ -228,6 +239,31 @@ namespace UnitTests
             DAQ.CloseInstance(instance);
 
             return res;
+        }
+
+        void gen_twiddle(int n)
+        {
+            float[] w = new float[n*2];
+
+            int i, j, k;
+            const float PI = 3.14159265358979323846F;
+
+            for (j = 1, k = 0; j < n >> 2; j = j << 2)
+            {
+                for (i = 0; i < n >> 2; i += j)
+                {
+                    w[k + 5] = (float)Math.Sin(6.0 * PI * i / n);
+                    w[k + 4] = (float)Math.Cos(6.0 * PI * i / n);
+
+                    w[k + 3] = (float)Math.Sin(4.0 * PI * i / n);
+                    w[k + 2] = (float)Math.Cos(4.0 * PI * i / n);
+
+                    w[k + 1] = (float)Math.Sin(2.0 * PI * i / n);
+                    w[k + 0] = (float)Math.Cos(2.0 * PI * i / n);
+
+                    k += 6;
+                }
+            }
         }
     }
 }

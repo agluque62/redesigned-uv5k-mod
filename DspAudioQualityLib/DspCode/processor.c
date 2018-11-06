@@ -369,6 +369,10 @@ void routine_test(int routine)
 		abs_complex(test_vector, PROCESSOR_BLOCK_SIZE);
 		break;
 
+	case 6:			// Inicializar FFT
+		fft_init();
+		break;
+
 	default:
 		break;
 	}
