@@ -39,7 +39,8 @@ static void abs_log_complex(complex_num * v, int n)
 	int i;
 	for (i = 0; i < n; i++)
 	{
-		v[i].real = log(sqrt(v[i].real*v[i].real + v[i].imaginary*v[i].imaginary));
+		float real = sqrt(v[i].real*v[i].real + v[i].imaginary*v[i].imaginary);
+		v[i].real = real==0 ? 0 : log(real);
 		v[i].imaginary = 0;
 	}
 }
@@ -255,7 +256,6 @@ float quality_indicator_float(processor_data_t * data)
 {
 	return data->quality.real;
 }
-
 
 void processor_init(processor_data_t * data, int instanceid)
 {
