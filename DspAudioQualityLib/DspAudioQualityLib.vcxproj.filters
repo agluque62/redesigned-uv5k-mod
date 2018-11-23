@@ -47,15 +47,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stdafx.cpp">
-      <Filter>Archivos de origen</Filter>
-    </ClCompile>
-    <ClCompile Include="DspAudioQualityLib.cpp">
-      <Filter>Archivos de origen</Filter>
-    </ClCompile>
-    <ClCompile Include="dllmain.cpp">
-      <Filter>Archivos de origen</Filter>
-    </ClCompile>
     <ClCompile Include="DspCode\DSPF_sp_fftSPxSP.c">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
@@ -71,9 +62,10 @@
     <ClCompile Include="DspCode\processor.c">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
-    <ClCompile Include="ChannelProcess.cpp">
-      <Filter>Archivos de origen</Filter>
-    </ClCompile>
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="DspAudioQualityLib.cpp" />
+    <ClCompile Include="ChannelProcess.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
